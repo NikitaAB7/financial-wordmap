@@ -47,6 +47,12 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        cluster: {
+          news: "hsl(var(--cluster-news))",
+          assets: "hsl(var(--cluster-assets))",
+          sectors: "hsl(var(--cluster-sectors))",
+          stocks: "hsl(var(--cluster-stocks))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
