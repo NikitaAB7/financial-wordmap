@@ -27,6 +27,14 @@ export interface StockDetail {
   description: string;
 }
 
+export interface NewsItem {
+  title: string;
+  source: string;
+  time: string;
+  sentiment: 'positive' | 'negative' | 'neutral';
+  snippet: string;
+}
+
 // Positions designed for a 1120x960 viewBox
 export const nodes: MapNode[] = [
   // Cluster 1 - News/Trending (left zone)
@@ -220,4 +228,185 @@ export const nodeDetails: Record<string, StockDetail> = {
   gs: { price: 452.80, change: 12.50, changePercent: 2.84, volume: '3M', marketCap: '152B', sparkline: [430, 435, 438, 442, 445, 448, 451, 453], signal: 'bullish', description: 'Goldman Sachs M&A advisory pipeline strengthening significantly.' },
   lmt: { price: 468.50, change: 15.80, changePercent: 3.49, volume: '2M', marketCap: '112B', sparkline: [440, 445, 450, 455, 458, 462, 465, 468], signal: 'bullish', description: 'Lockheed Martin backlog expanding on global defense contracts.' },
   rtx: { price: 102.30, change: 3.20, changePercent: 3.23, volume: '5M', marketCap: '138B', sparkline: [95, 96, 98, 99, 100, 101, 102, 102], signal: 'bullish', description: 'RTX Corp benefiting from Pratt & Whitney engine demand recovery.' },
+};
+
+// Mock news data per node
+export const nodeNews: Record<string, NewsItem[]> = {
+  war: [
+    { title: 'Tensions Escalate in Eastern Europe as NATO Bolsters Defenses', source: 'Reuters', time: '2h ago', sentiment: 'negative', snippet: 'NATO allies agree to increase defense spending amid rising threats on the eastern border.' },
+    { title: 'Middle East Conflict Pushes Oil Prices Higher', source: 'Bloomberg', time: '4h ago', sentiment: 'negative', snippet: 'Brent crude jumps 3% as shipping routes face new disruption risks.' },
+    { title: 'Defense Stocks Rally on Increased Military Budgets', source: 'CNBC', time: '6h ago', sentiment: 'positive', snippet: 'Lockheed Martin and RTX lead gains as governments boost arms procurement.' },
+  ],
+  fed: [
+    { title: 'Fed Officials Signal Patience on Rate Cuts', source: 'WSJ', time: '1h ago', sentiment: 'neutral', snippet: 'Multiple FOMC members suggest data dependency before any policy easing.' },
+    { title: 'Markets Reprice Rate Cut Expectations After Fed Minutes', source: 'Bloomberg', time: '3h ago', sentiment: 'negative', snippet: 'Probability of June cut drops to 35% from 60% after hawkish minutes.' },
+    { title: 'Powell Emphasizes Inflation Progress Still Needed', source: 'Reuters', time: '8h ago', sentiment: 'neutral', snippet: 'Chair Powell reiterates the Fed is not in a hurry to lower borrowing costs.' },
+  ],
+  'ai-buzz': [
+    { title: 'OpenAI Launches GPT-5 with Breakthrough Reasoning', source: 'TechCrunch', time: '30m ago', sentiment: 'positive', snippet: 'New model shows 40% improvement in complex reasoning benchmarks.' },
+    { title: 'Enterprise AI Spending Expected to Double in 2026', source: 'Gartner', time: '2h ago', sentiment: 'positive', snippet: 'Global AI infrastructure spending projected to reach $420B annually.' },
+    { title: 'AI Regulation Debate Heats Up in Congress', source: 'Politico', time: '5h ago', sentiment: 'neutral', snippet: 'Bipartisan bill proposes mandatory safety testing for frontier models.' },
+  ],
+  climate: [
+    { title: 'EU Carbon Border Tax Takes Effect, Impacts Imports', source: 'FT', time: '3h ago', sentiment: 'neutral', snippet: 'European carbon border adjustment mechanism begins charging importers.' },
+    { title: 'Record Heatwave Drives Energy Demand Surge', source: 'Reuters', time: '5h ago', sentiment: 'negative', snippet: 'Extreme temperatures boost electricity consumption across southern states.' },
+  ],
+  earnings: [
+    { title: 'S&P 500 Companies Beat Estimates by Widest Margin in 2 Years', source: 'FactSet', time: '1h ago', sentiment: 'positive', snippet: '78% of reporting companies exceeded EPS estimates this quarter.' },
+    { title: 'Tech Giants Drive Q1 Earnings Growth', source: 'Bloomberg', time: '4h ago', sentiment: 'positive', snippet: 'Magnificent Seven account for 60% of index earnings growth.' },
+  ],
+  'trade-war': [
+    { title: 'New Tariffs on Chinese EVs Announced', source: 'WSJ', time: '2h ago', sentiment: 'negative', snippet: 'US imposes 100% tariff on Chinese electric vehicle imports effective immediately.' },
+    { title: 'Supply Chain Reshoring Accelerates Amid Trade Tensions', source: 'Reuters', time: '6h ago', sentiment: 'neutral', snippet: 'Companies increasingly moving production to Mexico and Southeast Asia.' },
+  ],
+  'crypto-news': [
+    { title: 'Bitcoin ETF Inflows Hit Record $1.2B in Single Day', source: 'CoinDesk', time: '1h ago', sentiment: 'positive', snippet: 'BlackRock IBIT leads inflows as institutional demand surges.' },
+    { title: 'SEC Approves Ethereum ETF Applications', source: 'Bloomberg', time: '3h ago', sentiment: 'positive', snippet: 'Spot Ethereum ETFs expected to begin trading next month.' },
+  ],
+  'jobs-data': [
+    { title: 'Non-Farm Payrolls Come in Below Expectations', source: 'BLS', time: '2h ago', sentiment: 'neutral', snippet: 'Economy added 175K jobs vs 240K expected, unemployment ticks up to 3.9%.' },
+    { title: 'Wage Growth Moderates, Easing Inflation Concerns', source: 'Reuters', time: '3h ago', sentiment: 'positive', snippet: 'Average hourly earnings rise 3.9% YoY, slowest pace in two years.' },
+  ],
+  inflation: [
+    { title: 'Core CPI Remains Sticky at 3.8% YoY', source: 'BLS', time: '1h ago', sentiment: 'negative', snippet: 'Shelter and services inflation continue to run above Fed target.' },
+    { title: 'PCE Deflator Shows Modest Improvement', source: 'Commerce Dept', time: '4h ago', sentiment: 'neutral', snippet: 'Fed preferred inflation gauge edges down to 2.7% from 2.8%.' },
+  ],
+  geopolitics: [
+    { title: 'South China Sea Tensions Rise After Naval Confrontation', source: 'Reuters', time: '2h ago', sentiment: 'negative', snippet: 'Philippines and China vessels involved in confrontation near disputed territory.' },
+    { title: 'BRICS Expansion Creates New Economic Bloc Dynamics', source: 'FT', time: '5h ago', sentiment: 'neutral', snippet: 'Expanded BRICS nations represent 46% of world population and 29% of GDP.' },
+  ],
+  crude: [
+    { title: 'OPEC+ Extends Production Cuts Through Q3', source: 'Bloomberg', time: '1h ago', sentiment: 'positive', snippet: 'Saudi Arabia leads voluntary cuts of 2.2M barrels per day.' },
+    { title: 'US Shale Output Growth Slowing on Capital Discipline', source: 'Reuters', time: '3h ago', sentiment: 'positive', snippet: 'Permian Basin rig count declines as producers prioritize returns.' },
+  ],
+  gold: [
+    { title: 'Central Banks Buy Record 290 Tonnes in Q1', source: 'World Gold Council', time: '2h ago', sentiment: 'positive', snippet: 'China and emerging market central banks continue aggressive gold accumulation.' },
+    { title: 'Gold Hits All-Time High Amid Geopolitical Uncertainty', source: 'Bloomberg', time: '4h ago', sentiment: 'positive', snippet: 'Spot gold breaches $2,400 as investors seek safe-haven assets.' },
+  ],
+  usd: [
+    { title: 'Dollar Steadies as Rate Cut Bets Moderate', source: 'Reuters', time: '2h ago', sentiment: 'neutral', snippet: 'DXY index holds near 104 as traders reassess Fed timeline.' },
+  ],
+  'fixed-income': [
+    { title: 'Treasury Yields Drop on Softer Economic Data', source: 'Bloomberg', time: '1h ago', sentiment: 'neutral', snippet: '10-year yield falls to 4.25% after weaker-than-expected retail sales.' },
+  ],
+  equity: [
+    { title: 'S&P 500 Closes at Record High for 22nd Time This Year', source: 'CNBC', time: '30m ago', sentiment: 'positive', snippet: 'Broad market rally led by technology and financial sectors.' },
+    { title: 'Market Breadth Improves as Small Caps Join Rally', source: 'Bloomberg', time: '2h ago', sentiment: 'positive', snippet: 'Russell 2000 gains 2.1% as rotation trade gains momentum.' },
+  ],
+  commodities: [
+    { title: 'Copper Hits 2-Year High on Supply Deficit', source: 'Reuters', time: '3h ago', sentiment: 'positive', snippet: 'LME copper surges past $10,000/tonne on mine disruptions.' },
+  ],
+  bitcoin: [
+    { title: 'Bitcoin Breaks $68K as Halving Rally Continues', source: 'CoinDesk', time: '1h ago', sentiment: 'positive', snippet: 'Post-halving supply squeeze drives prices toward all-time highs.' },
+    { title: 'MicroStrategy Announces Additional $500M Bitcoin Purchase', source: 'Bloomberg', time: '3h ago', sentiment: 'positive', snippet: 'Corporate treasury demand for Bitcoin continues to grow.' },
+  ],
+  'natural-gas': [
+    { title: 'LNG Export Demand Drives US Natural Gas Higher', source: 'Reuters', time: '2h ago', sentiment: 'positive', snippet: 'European and Asian buyers lock in long-term US LNG contracts.' },
+  ],
+  silver: [
+    { title: 'Silver Demand Surges on Solar Panel Manufacturing Boom', source: 'Silver Institute', time: '4h ago', sentiment: 'positive', snippet: 'Industrial silver demand hits record as solar capacity expands globally.' },
+  ],
+  'bonds-10y': [
+    { title: 'Treasury Auction Sees Strong Demand from Foreign Buyers', source: 'Reuters', time: '2h ago', sentiment: 'positive', snippet: 'Indirect bidders take 73% of $42B 10-year note auction.' },
+  ],
+  'real-estate': [
+    { title: 'Commercial Property Defaults Rise to Post-GFC Highs', source: 'WSJ', time: '3h ago', sentiment: 'negative', snippet: 'Office vacancy rates hit 19.6% nationally as remote work persists.' },
+  ],
+  vix: [
+    { title: 'VIX Spikes 15% on Geopolitical Concerns', source: 'CBOE', time: '1h ago', sentiment: 'negative', snippet: 'Fear gauge rises sharply as options traders increase hedging activity.' },
+  ],
+  tech: [
+    { title: 'Semiconductor Stocks Lead Tech Rally on AI Demand', source: 'Bloomberg', time: '1h ago', sentiment: 'positive', snippet: 'Philadelphia Semiconductor Index up 3.2% on data center buildout.' },
+    { title: 'Cloud Revenue Growth Accelerates Across Big Tech', source: 'CNBC', time: '3h ago', sentiment: 'positive', snippet: 'AWS, Azure, and GCP all report 25%+ YoY growth rates.' },
+  ],
+  energy: [
+    { title: 'Energy Sector Posts Best Quarter in Two Years', source: 'Reuters', time: '2h ago', sentiment: 'positive', snippet: 'Rising oil prices and refining margins boost energy profits.' },
+  ],
+  auto: [
+    { title: 'EV Sales Growth Slows as Consumers Shift to Hybrids', source: 'Automotive News', time: '3h ago', sentiment: 'neutral', snippet: 'Hybrid vehicle sales jump 50% while pure EV growth moderates.' },
+  ],
+  health: [
+    { title: 'GLP-1 Drug Market Expected to Reach $100B by 2030', source: 'Goldman Sachs', time: '2h ago', sentiment: 'positive', snippet: 'Obesity treatment drugs reshape healthcare investment landscape.' },
+  ],
+  financial: [
+    { title: 'Bank Earnings Beat on Trading Revenue Surge', source: 'Bloomberg', time: '1h ago', sentiment: 'positive', snippet: 'JPMorgan and Goldman Sachs report record trading quarters.' },
+  ],
+  consumer: [
+    { title: 'Retail Sales Surprise to Upside in March', source: 'Commerce Dept', time: '2h ago', sentiment: 'positive', snippet: 'Consumer spending resilience supports discretionary sector outlook.' },
+  ],
+  utilities: [
+    { title: 'Data Center Power Demand Boosts Utility Stocks', source: 'Reuters', time: '4h ago', sentiment: 'positive', snippet: 'AI infrastructure buildout drives electricity demand growth projections.' },
+  ],
+  materials: [
+    { title: 'Infrastructure Bill Funding Flows Boost Materials Demand', source: 'Reuters', time: '3h ago', sentiment: 'positive', snippet: 'Steel and cement producers see order books fill on government projects.' },
+  ],
+  telecom: [
+    { title: '5G Rollout Costs Weigh on Telecom Margins', source: 'FT', time: '5h ago', sentiment: 'negative', snippet: 'Network upgrade capex continues to pressure telecom profitability.' },
+  ],
+  defense: [
+    { title: 'Pentagon Awards $50B Multi-Year Contract Package', source: 'Defense One', time: '1h ago', sentiment: 'positive', snippet: 'Major defense primes set to benefit from sustained spending increase.' },
+  ],
+  nvda: [
+    { title: 'NVIDIA H200 Chips Sell Out Through 2026', source: 'Reuters', time: '1h ago', sentiment: 'positive', snippet: 'Data center GPU demand remains insatiable as AI training scales up.' },
+    { title: 'NVIDIA Partners with Sovereign AI Funds', source: 'Bloomberg', time: '3h ago', sentiment: 'positive', snippet: 'Middle East and Asian governments invest in NVIDIA-powered AI infrastructure.' },
+    { title: 'Analyst Raises NVIDIA Target to $1,200', source: 'BofA Research', time: '5h ago', sentiment: 'positive', snippet: 'Data center revenue expected to exceed $100B run rate by year end.' },
+  ],
+  msft: [
+    { title: 'Microsoft Copilot Adoption Surges Among Enterprise Clients', source: 'CNBC', time: '2h ago', sentiment: 'positive', snippet: 'Office 365 Copilot users grow 300% QoQ as productivity gains validated.' },
+    { title: 'Azure Revenue Grows 31% Driven by AI Workloads', source: 'Bloomberg', time: '4h ago', sentiment: 'positive', snippet: 'Cloud AI services account for 8 percentage points of Azure growth.' },
+  ],
+  aapl: [
+    { title: 'Apple Vision Pro Sales Disappoint in First Quarter', source: 'WSJ', time: '2h ago', sentiment: 'negative', snippet: 'Spatial computing device sells below expectations at 200K units.' },
+    { title: 'iPhone 16 Pro Max Leads Upgrade Cycle', source: 'Counterpoint', time: '5h ago', sentiment: 'positive', snippet: 'Premium tier drives higher ASPs despite flat unit volumes.' },
+  ],
+  googl: [
+    { title: 'Google AI Overviews Boost Search Revenue Per Query', source: 'Bloomberg', time: '1h ago', sentiment: 'positive', snippet: 'AI-generated answers increase ad engagement and click-through rates.' },
+  ],
+  amzn: [
+    { title: 'Amazon AWS Launches Custom AI Chip Trainium2', source: 'TechCrunch', time: '2h ago', sentiment: 'positive', snippet: 'New chip offers 4x performance improvement for AI training workloads.' },
+  ],
+  meta: [
+    { title: 'Meta AI Assistant Reaches 400M Monthly Users', source: 'The Verge', time: '1h ago', sentiment: 'positive', snippet: 'Llama-powered assistant becomes fastest-growing AI product.' },
+  ],
+  xom: [
+    { title: 'ExxonMobil Guyana Production Hits 650K BPD', source: 'Reuters', time: '3h ago', sentiment: 'positive', snippet: 'Stabroek block expansion drives low-cost production growth.' },
+  ],
+  cvx: [
+    { title: 'Chevron Refining Margins Hit Multi-Year Highs', source: 'Bloomberg', time: '2h ago', sentiment: 'positive', snippet: 'Crack spreads widen as seasonal demand meets tight supply.' },
+  ],
+  tsla: [
+    { title: 'Tesla Cuts Prices Again in China Amid Competition', source: 'Reuters', time: '1h ago', sentiment: 'negative', snippet: 'Model 3 and Y prices reduced by up to 5% in key market.' },
+    { title: 'Cybertruck Production Ramp Faces Battery Supply Issues', source: 'Electrek', time: '4h ago', sentiment: 'negative', snippet: '4680 cell yield improvements slower than expected.' },
+  ],
+  ford: [
+    { title: 'Ford F-150 Lightning Sales Surge 80% YoY', source: 'Automotive News', time: '3h ago', sentiment: 'positive', snippet: 'Electric truck gains market share as fleet orders accelerate.' },
+  ],
+  rivn: [
+    { title: 'Rivian Cash Burn Raises Going Concern Questions', source: 'Bloomberg', time: '2h ago', sentiment: 'negative', snippet: 'Company has 18 months of runway at current spending rate.' },
+  ],
+  pfe: [
+    { title: 'Pfizer Oncology Pipeline Shows Promise in Phase 3 Trials', source: 'Reuters', time: '3h ago', sentiment: 'positive', snippet: 'Three cancer drugs in late-stage development could drive growth.' },
+  ],
+  jnj: [
+    { title: 'J&J MedTech Division Posts Strong Surgical Growth', source: 'Bloomberg', time: '2h ago', sentiment: 'positive', snippet: 'Robotic surgery platform adoption accelerates across hospitals.' },
+  ],
+  unh: [
+    { title: 'UnitedHealth Faces DOJ Antitrust Investigation', source: 'WSJ', time: '1h ago', sentiment: 'negative', snippet: 'Department of Justice examining vertical integration practices.' },
+  ],
+  jpm: [
+    { title: 'JPMorgan Trading Revenue Hits Record $8.4B', source: 'Bloomberg', time: '1h ago', sentiment: 'positive', snippet: 'Fixed income and equities trading both exceed expectations.' },
+    { title: 'Dimon Warns of Geopolitical Risks in Annual Letter', source: 'CNBC', time: '4h ago', sentiment: 'neutral', snippet: 'CEO highlights inflation, conflicts, and fiscal deficits as key concerns.' },
+  ],
+  bac: [
+    { title: 'Bank of America Digital Banking Users Reach 47M', source: 'Reuters', time: '3h ago', sentiment: 'positive', snippet: 'Digital transformation drives cost efficiency improvements.' },
+  ],
+  gs: [
+    { title: 'Goldman Sachs M&A Pipeline Hits 3-Year High', source: 'Bloomberg', time: '2h ago', sentiment: 'positive', snippet: 'IPO and M&A advisory backlog strengthens as deal activity rebounds.' },
+  ],
+  lmt: [
+    { title: 'Lockheed F-35 Deliveries Accelerate in Q1', source: 'Defense News', time: '2h ago', sentiment: 'positive', snippet: 'Fighter jet production rate increases to 156 units annually.' },
+  ],
+  rtx: [
+    { title: 'Pratt & Whitney GTF Engine Inspections Near Completion', source: 'Reuters', time: '3h ago', sentiment: 'positive', snippet: 'Powder metal issue resolution ahead of schedule, earnings impact limited.' },
+  ],
 };
