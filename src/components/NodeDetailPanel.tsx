@@ -13,9 +13,10 @@ interface NodeDetailPanelProps {
   node: MapNode;
   connectedLabels: string[];
   onClose: () => void;
+  isMobile?: boolean;
 }
 
-export default function NodeDetailPanel({ node, connectedLabels, onClose }: NodeDetailPanelProps) {
+export default function NodeDetailPanel({ node, connectedLabels, onClose, isMobile }: NodeDetailPanelProps) {
   const detail = nodeDetails[node.id];
   if (!detail) return null;
 
@@ -29,13 +30,71 @@ export default function NodeDetailPanel({ node, connectedLabels, onClose }: Node
   const signalColor = detail.signal === 'bullish' ? 'hsl(152, 70%, 45%)' : detail.signal === 'bearish' ? 'hsl(0, 70%, 55%)' : 'hsl(210, 15%, 50%)';
   const SignalIcon = detail.signal === 'bullish' ? TrendingUp : detail.signal === 'bearish' ? TrendingDown : Minus;
 
+  if (isMobile) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 100 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 100 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        className="fixed inset-x-0 bottom-0 z-30 rounded-t-2xl border-t border-border bg-card/98 backdrop-blur-xl shadow-2xl max-h-[50vh] overflow-auto"
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border sticky top-0 bg-card/98 backdrop-blur-xl">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CLUSTER_HSL[node.cluster] }} />
+            <span className="font-display text-sm font-bold text-foreground">{node.label}</span>
+            <div className="flex items-center gap-1 ml-2">
+              <SignalIcon size={11} style={{ color: signalColor }} />
+              <span className="font-mono text-[9px] uppercase tracking-wider" style={{ color: signalColor }}>{detail.signal}</span>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-muted-foreground hover:text-foreground">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-3">
+          {detail.price > 0 && (
+            <div className="flex items-baseline gap-3">
+              <span className="font-mono text-xl font-bold text-foreground">
+                {detail.price >= 1000 ? detail.price.toLocaleString() : detail.price.toFixed(2)}
+              </span>
+              <span className="font-mono text-xs" style={{ color: detail.change >= 0 ? 'hsl(152, 70%, 45%)' : 'hsl(0, 70%, 55%)' }}>
+                {detail.change >= 0 ? '+' : ''}{detail.change.toFixed(2)} ({detail.changePercent >= 0 ? '+' : ''}{detail.changePercent.toFixed(2)}%)
+              </span>
+            </div>
+          )}
+          {detail.price === 0 && detail.changePercent !== 0 && (
+            <div className="font-mono text-lg font-bold" style={{ color: detail.changePercent >= 0 ? 'hsl(152, 70%, 45%)' : 'hsl(0, 70%, 55%)' }}>
+              {detail.changePercent >= 0 ? '+' : ''}{detail.changePercent.toFixed(2)}%
+            </div>
+          )}
+
+          <svg viewBox="0 0 140 44" className="w-full h-8">
+            <polyline points={sparkPoints} fill="none" stroke={signalColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+
+          <p className="text-xs text-muted-foreground leading-relaxed">{detail.description}</p>
+
+          {connectedLabels.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {connectedLabels.map((label, i) => (
+                <span key={i} className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground">{label}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
-      initial={{ opacity: 0, x: 20 }}
+      initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
+      exit={{ opacity: 0, x: -20 }}
       transition={{ duration: 0.2 }}
-      className="fixed top-20 right-4 z-30 w-72 rounded-xl border border-border bg-card/95 backdrop-blur-md shadow-2xl overflow-hidden"
+      className="fixed top-20 left-4 z-30 w-72 rounded-xl border border-border bg-card/95 backdrop-blur-md shadow-2xl overflow-hidden"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
@@ -53,13 +112,9 @@ export default function NodeDetailPanel({ node, connectedLabels, onClose }: Node
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
             <SignalIcon size={12} style={{ color: signalColor }} />
-            <span className="font-mono text-[10px] uppercase tracking-wider" style={{ color: signalColor }}>
-              {detail.signal}
-            </span>
+            <span className="font-mono text-[10px] uppercase tracking-wider" style={{ color: signalColor }}>{detail.signal}</span>
           </div>
-          <span className="font-mono text-[9px] text-muted-foreground tracking-wider">
-            {clusterMeta[node.cluster].label}
-          </span>
+          <span className="font-mono text-[9px] text-muted-foreground tracking-wider">{clusterMeta[node.cluster].label}</span>
         </div>
 
         {detail.price > 0 && (
@@ -84,14 +139,7 @@ export default function NodeDetailPanel({ node, connectedLabels, onClose }: Node
       <div className="px-4 py-3 border-b border-border">
         <p className="font-mono text-[9px] text-muted-foreground tracking-wider mb-2">7D TREND</p>
         <svg viewBox="0 0 140 44" className="w-full h-10">
-          <polyline
-            points={sparkPoints}
-            fill="none"
-            stroke={signalColor}
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          <polyline points={sparkPoints} fill="none" stroke={signalColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           <polyline
             points={`0,44 ${sparkPoints} 140,44`}
             fill={detail.signal === 'bullish' ? 'hsla(152, 70%, 45%, 0.08)' : detail.signal === 'bearish' ? 'hsla(0, 70%, 55%, 0.08)' : 'hsla(210, 15%, 50%, 0.05)'}
@@ -129,9 +177,7 @@ export default function NodeDetailPanel({ node, connectedLabels, onClose }: Node
           <p className="font-mono text-[9px] text-muted-foreground tracking-wider mb-1.5">CONNECTIONS</p>
           <div className="flex flex-wrap gap-1">
             {connectedLabels.map((label, i) => (
-              <span key={i} className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground">
-                {label}
-              </span>
+              <span key={i} className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground">{label}</span>
             ))}
           </div>
         </div>
