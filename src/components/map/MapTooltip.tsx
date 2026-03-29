@@ -1,6 +1,14 @@
 import { memo } from 'react';
 import { motion } from 'framer-motion';
-import { type MapNode, type MapEdge, type ClusterType, clusterMeta } from '@/data/financialMapData';
+import { type MapNode, type MapEdgeCompat, type ClusterType } from '@/types';
+
+// Static cluster metadata
+const clusterMeta: Record<ClusterType, { label: string }> = {
+  news: { label: 'NEWS & SENTIMENT' },
+  assets: { label: 'ASSET CLASSES' },
+  sectors: { label: 'SECTORS' },
+  stocks: { label: 'STOCKS' },
+};
 
 const CLUSTER_HSL: Record<ClusterType, string> = {
   news: 'hsl(38, 95%, 60%)',
@@ -12,7 +20,7 @@ const CLUSTER_HSL: Record<ClusterType, string> = {
 interface MapTooltipProps {
   hoveredNode: string;
   nodeMap: Map<string, MapNode>;
-  edges: MapEdge[];
+  edges: MapEdgeCompat[];
   isMobile: boolean;
 }
 

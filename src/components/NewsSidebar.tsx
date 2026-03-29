@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion';
-import { X, ExternalLink, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { type MapNode, type ClusterType, nodeNews, type NewsItem } from '@/data/financialMapData';
+import { X, ExternalLink, TrendingUp, TrendingDown, Minus, Loader2 } from 'lucide-react';
+import { type MapNode, type ClusterType, type NewsItem } from '@/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useNodeNews } from '@/hooks/useMapData';
 
 const CLUSTER_HSL: Record<ClusterType, string> = {
   news: 'hsl(38, 95%, 60%)',
@@ -23,7 +24,21 @@ interface NewsSidebarProps {
 }
 
 export default function NewsSidebar({ node, onClose, isMobile }: NewsSidebarProps) {
-  const news = nodeNews[node.id] || [];
+  const { data: news = [], isLoading, error } = useNodeNews(node.id);
+
+  // Loading component
+  const LoadingState = () => (
+    <div className="flex items-center justify-center py-12">
+      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+    </div>
+  );
+
+  // Error or empty state
+  const EmptyState = () => (
+    <p className="text-xs text-muted-foreground text-center py-12">
+      {error ? 'Failed to load news' : 'No news available for this topic.'}
+    </p>
+  );
 
   if (isMobile) {
     return (
@@ -46,10 +61,9 @@ export default function NewsSidebar({ node, onClose, isMobile }: NewsSidebarProp
         </div>
         <ScrollArea className="h-[calc(70vh-52px)]">
           <div className="p-3 space-y-2">
-            {news.length === 0 && (
-              <p className="text-xs text-muted-foreground text-center py-8">No news available for this topic.</p>
-            )}
-            {news.map((item, i) => (
+            {isLoading && <LoadingState />}
+            {!isLoading && news.length === 0 && <EmptyState />}
+            {!isLoading && news.map((item, i) => (
               <NewsCard key={i} item={item} />
             ))}
           </div>
@@ -83,10 +97,9 @@ export default function NewsSidebar({ node, onClose, isMobile }: NewsSidebarProp
       {/* News list */}
       <ScrollArea className="flex-1">
         <div className="p-3 space-y-2">
-          {news.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-12">No news available for this topic.</p>
-          )}
-          {news.map((item, i) => (
+          {isLoading && <LoadingState />}
+          {!isLoading && news.length === 0 && <EmptyState />}
+          {!isLoading && news.map((item, i) => (
             <NewsCard key={i} item={item} />
           ))}
         </div>
@@ -95,7 +108,7 @@ export default function NewsSidebar({ node, onClose, isMobile }: NewsSidebarProp
       {/* Footer */}
       <div className="px-4 py-2.5 border-t border-border flex-shrink-0">
         <p className="font-mono text-[8px] text-muted-foreground/50 text-center tracking-wider">
-          {news.length} ARTICLE{news.length !== 1 ? 'S' : ''} · MOCK DATA
+          {isLoading ? 'LOADING...' : `${news.length} ARTICLE${news.length !== 1 ? 'S' : ''} · TAVILY`}
         </p>
       </div>
     </motion.div>
@@ -106,13 +119,23 @@ function NewsCard({ item }: { item: NewsItem }) {
   const sentiment = SENTIMENT_CONFIG[item.sentiment];
   const SentimentIcon = sentiment.icon;
 
+  const handleClick = () => {
+    if (item.url) {
+      window.open(item.url, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   return (
-    <div className="group p-3 rounded-lg border border-border hover:border-foreground/10 bg-secondary/30 hover:bg-secondary/60 transition-all cursor-pointer">
+    <div 
+      className="group p-3 rounded-lg border border-border hover:border-foreground/10 bg-secondary/30 hover:bg-secondary/60 transition-all cursor-pointer"
+      onClick={handleClick}
+      role={item.url ? "link" : undefined}
+    >
       <div className="flex items-start justify-between gap-2 mb-1.5">
         <h3 className="text-xs font-medium text-foreground leading-snug line-clamp-2 group-hover:text-primary transition-colors">
           {item.title}
         </h3>
-        <ExternalLink size={10} className="text-muted-foreground/40 flex-shrink-0 mt-0.5" />
+        {item.url && <ExternalLink size={10} className="text-muted-foreground/40 flex-shrink-0 mt-0.5" />}
       </div>
       <p className="text-[10px] text-muted-foreground leading-relaxed mb-2 line-clamp-2">{item.snippet}</p>
       <div className="flex items-center justify-between">

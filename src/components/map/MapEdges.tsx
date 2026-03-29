@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { type MapNode, type MapEdge, type ClusterType } from '@/data/financialMapData';
+import { type MapNode, type MapEdgeCompat, type ClusterType } from '@/types';
 
 const CLUSTER_HSL: Record<ClusterType, string> = {
   news: 'hsl(38, 95%, 60%)',
@@ -9,7 +9,7 @@ const CLUSTER_HSL: Record<ClusterType, string> = {
 };
 
 interface MapEdgesProps {
-  edges: MapEdge[];
+  edges: MapEdgeCompat[];
   nodeMap: Map<string, MapNode>;
   isNodeVisible: (node: MapNode) => boolean;
   isEdgeHighlighted: (from: string, to: string) => boolean;

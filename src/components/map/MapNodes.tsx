@@ -1,5 +1,5 @@
 import { memo, type MutableRefObject } from 'react';
-import { type MapNode, type ClusterType } from '@/data/financialMapData';
+import { type MapNode, type ClusterType } from '@/types';
 
 const CLUSTER_HSL: Record<ClusterType, string> = {
   news: 'hsl(38, 95%, 60%)',

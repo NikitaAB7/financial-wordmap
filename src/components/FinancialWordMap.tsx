@@ -1,15 +1,23 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { Search, X, RotateCcw } from 'lucide-react';
-import { nodes as rawNodes, edges, clusterMeta, type MapNode, type ClusterType } from '@/data/financialMapData';
+import { Search, X, RotateCcw, Loader2 } from 'lucide-react';
+import { type MapNode, type ClusterType } from '@/types';
 import NodeDetailPanel from './NodeDetailPanel';
-import NewsSidebar from './NewsSidebar';
 import { useForceLayout } from '@/hooks/useForceLayout';
 import { usePanZoom } from '@/hooks/usePanZoom';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useMapData } from '@/hooks/useMapData';
 import MapEdges from './map/MapEdges';
 import MapNodes from './map/MapNodes';
 import MapTooltip from './map/MapTooltip';
+
+// Static cluster metadata (could also be fetched from API)
+const clusterMeta: Record<ClusterType, { label: string; color: string }> = {
+  news: { label: 'NEWS & SENTIMENT', color: 'hsl(38, 92%, 50%)' },
+  assets: { label: 'ASSET CLASSES', color: 'hsl(180, 70%, 45%)' },
+  sectors: { label: 'SECTORS', color: 'hsl(152, 60%, 40%)' },
+  stocks: { label: 'STOCKS', color: 'hsl(270, 60%, 55%)' },
+};
 
 const CLUSTER_HSL: Record<ClusterType, string> = {
   news: 'hsl(38, 95%, 60%)',
@@ -22,11 +30,15 @@ export default function FinancialWordMap() {
   const isMobile = useIsMobile();
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
-  const [showNews, setShowNews] = useState(false);
   const [selectedCluster, setSelectedCluster] = useState<ClusterType | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // Fetch map data from API
+  const { data: mapData, isLoading, error } = useMapData();
+  const rawNodes = mapData?.nodes ?? [];
+  const edges = mapData?.edges ?? [];
 
   // Force-directed layout
   const layoutNodes = useForceLayout(rawNodes, edges);
@@ -44,7 +56,6 @@ export default function FinancialWordMap() {
       if (e.key === 'Escape') {
         setSearchQuery('');
         setSelectedNode(null);
-        setShowNews(false);
         searchRef.current?.blur();
       }
     };
@@ -77,14 +88,7 @@ export default function FinancialWordMap() {
   }, [layoutNodes]);
 
   const handleNodeClick = useCallback((nodeId: string) => {
-    setSelectedNode(prev => {
-      if (prev === nodeId) {
-        setShowNews(false);
-        return null;
-      }
-      setShowNews(true);
-      return nodeId;
-    });
+    setSelectedNode(prev => prev === nodeId ? null : nodeId);
   }, []);
 
   const selectedNodeData = selectedNode ? nodeMap.get(selectedNode) : null;
@@ -113,6 +117,36 @@ export default function FinancialWordMap() {
     if (!activeHighlight) return false;
     return (from === activeHighlight || to === activeHighlight);
   }, [activeHighlight]);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="relative w-full h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="font-mono text-sm text-muted-foreground">Loading market data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="relative w-full h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 max-w-md text-center p-6">
+          <p className="font-display font-bold text-lg text-destructive">Failed to load data</p>
+          <p className="font-mono text-sm text-muted-foreground">{error.message}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-mono text-sm"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-screen bg-background overflow-hidden select-none">
@@ -267,24 +301,13 @@ export default function FinancialWordMap() {
         )}
       </AnimatePresence>
 
-      {/* Detail Panel */}
+      {/* Detail Panel (includes news and concalls) */}
       <AnimatePresence>
         {selectedNodeData && (
           <NodeDetailPanel
             node={selectedNodeData}
             connectedLabels={selectedConnectedLabels}
-            onClose={() => { setSelectedNode(null); setShowNews(false); }}
-            isMobile={isMobile}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* News Sidebar */}
-      <AnimatePresence>
-        {showNews && selectedNodeData && (
-          <NewsSidebar
-            node={selectedNodeData}
-            onClose={() => setShowNews(false)}
+            onClose={() => setSelectedNode(null)}
             isMobile={isMobile}
           />
         )}

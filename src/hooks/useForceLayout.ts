@@ -1,5 +1,12 @@
 import { useMemo } from 'react';
-import { type MapNode, type MapEdge } from '@/data/financialMapData';
+import { type MapNode, type MapEdgeCompat } from '@/types';
+
+// Also accept the old MapEdge format for compatibility
+interface MapEdgeLegacy {
+  from: string;
+  to: string;
+  label?: string;
+}
 
 /**
  * Simple force-directed nudge: nodes sharing more connections are pulled closer.
@@ -7,7 +14,7 @@ import { type MapNode, type MapEdge } from '@/data/financialMapData';
  */
 export function useForceLayout(
   initialNodes: MapNode[],
-  edges: MapEdge[],
+  edges: (MapEdgeCompat | MapEdgeLegacy)[],
   iterations = 60,
   attractionStrength = 0.012,
   repulsionStrength = 800,
