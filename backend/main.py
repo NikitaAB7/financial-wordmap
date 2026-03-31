@@ -13,9 +13,15 @@ from models.schemas import (
     ClusterMeta,
     StockDetail,
     DocumentChunk,
+    NewsTopic as NewsTopicSchema,
+    NodeHighlight,
+    TopicEdge,
+    TopicsResponse,
+    TopicHeadline,
 )
 from services.qdrant_service import qdrant_service, NIFTY_50_STOCKS
 from services.tavily_service import tavily_service
+from services.topic_mapper import topic_mapper
 
 
 @asynccontextmanager
@@ -95,6 +101,31 @@ async def get_node_details(node_id: str):
     """
     Get detailed information for a specific node including stock data and news.
     """
+    # Check if this is a news cluster topic
+    if node_id in NEWS_CLUSTER_TOPICS:
+        topic_label = NEWS_CLUSTER_TOPICS[node_id]
+        topic_descriptions = {
+            "fed_sentiment": "Federal Reserve policy decisions and their impact on Indian markets. Track interest rate changes, monetary policy shifts, and global liquidity trends.",
+            "market_mood": "Overall sentiment in Indian equity markets. Gauge investor confidence, FII/DII flows, and market breadth indicators.",
+            "global_risk": "Geopolitical tensions, trade conflicts, and global economic risks affecting emerging markets and India specifically.",
+            "earnings_season": "Corporate earnings results from Nifty 50 and broader market companies. Track revenue growth, profit margins, and guidance.",
+            "inflation_watch": "India's inflation trends, RBI monetary policy decisions, and their impact on interest rates and equity valuations.",
+        }
+        
+        details = StockDetail(
+            price=0,
+            change=0,
+            changePercent=0,
+            volume="N/A",
+            marketCap="N/A",
+            sparkline=[0] * 8,
+            signal="neutral",
+            description=topic_descriptions.get(node_id, f"News and analysis about {topic_label}"),
+        )
+        
+        news = await tavily_service.get_topic_news(node_id, topic_label)
+        return NodeDetailResponse(details=details, news=news)
+    
     # Get stock details
     details = qdrant_service.get_stock_details(node_id)
     
@@ -124,12 +155,76 @@ async def get_node_details(node_id: str):
     )
 
 
+# News cluster topic IDs and labels
+NEWS_CLUSTER_TOPICS = {
+    "fed_sentiment": "Fed Sentiment",
+    "market_mood": "Market Mood",
+    "global_risk": "Global Risk",
+    "earnings_season": "Earnings Season",
+    "inflation_watch": "Inflation Watch",
+}
+
+# Sector definitions with descriptions
+SECTOR_INFO = {
+    "sector_banking": {"label": "Banking", "description": "Indian banking sector including public and private banks. Track HDFC Bank, ICICI Bank, SBI, and other key players."},
+    "sector_it": {"label": "IT Services", "description": "Information technology and software services sector. Includes TCS, Infosys, Wipro, HCL Tech."},
+    "sector_fmcg": {"label": "FMCG", "description": "Fast-moving consumer goods sector. Track HUL, ITC, Nestle, Britannia and consumer demand trends."},
+    "sector_pharma": {"label": "Pharma", "description": "Pharmaceutical and healthcare sector. Includes Sun Pharma, Dr Reddy's, Cipla and regulatory news."},
+    "sector_auto": {"label": "Auto", "description": "Automobile and auto ancillary sector. Track Tata Motors, M&M, Maruti and EV transition news."},
+    "sector_energy": {"label": "Energy", "description": "Oil, gas and energy sector. Includes Reliance, ONGC, BPCL and crude oil impact."},
+    "sector_metal": {"label": "Metals", "description": "Metals and mining sector. Track Tata Steel, JSW Steel, Hindalco and commodity prices."},
+    "sector_power": {"label": "Power", "description": "Power generation and utilities sector. Includes NTPC, Power Grid, and renewable energy trends."},
+    "sector_cement": {"label": "Cement", "description": "Cement and building materials sector. Track infrastructure spending and construction demand."},
+    "sector_telecom": {"label": "Telecom", "description": "Telecommunications sector. Includes Bharti Airtel, Jio and 5G rollout news."},
+    "sector_consumer": {"label": "Consumer", "description": "Consumer durables and discretionary sector. Track spending patterns and urban demand."},
+    "sector_financial": {"label": "Financial Services", "description": "NBFCs, insurance, and financial services. Includes Bajaj Finance, HDFC Life and credit growth."},
+    "sector_infrastructure": {"label": "Infrastructure", "description": "Infrastructure and construction sector. Track L&T, Adani and government capex."},
+    "sector_healthcare": {"label": "Healthcare", "description": "Healthcare services and hospitals. Includes Apollo Hospitals and healthcare spending trends."},
+    "sector_retail": {"label": "Retail", "description": "Retail sector and consumer trends. Track organized retail growth and e-commerce impact."},
+    "sector_conglomerate": {"label": "Conglomerate", "description": "Large diversified conglomerates. Includes Reliance, Tata group, and Adani group news."},
+    "sector_chemicals": {"label": "Chemicals", "description": "Chemicals and specialty chemicals sector. Track raw material costs and export trends."},
+    "sector_insurance": {"label": "Insurance", "description": "Life and general insurance sector. Includes LIC, HDFC Life and insurance penetration trends."},
+    "sector_mining": {"label": "Mining", "description": "Mining and minerals sector. Track Coal India, Vedanta and commodity cycles."},
+}
+
+# Asset class definitions with descriptions
+ASSET_INFO = {
+    "crude_oil": {"label": "Crude Oil", "description": "Brent and WTI crude oil prices. Track OPEC decisions, supply disruptions and impact on Indian markets."},
+    "gold": {"label": "Gold", "description": "Gold prices and precious metals. Safe haven demand, jewelry consumption and MCX gold trends."},
+    "usd_inr": {"label": "USD/INR", "description": "Dollar-Rupee exchange rate. Track RBI intervention, FII flows and currency volatility."},
+    "nifty50": {"label": "Nifty 50", "description": "Nifty 50 index performance. Benchmark for Indian large-cap equities and market breadth."},
+    "bitcoin": {"label": "Bitcoin", "description": "Bitcoin and cryptocurrency markets. Track regulatory news and crypto adoption in India."},
+    "equity": {"label": "Equity", "description": "Indian equity markets overview. Track FII/DII flows, market sentiment and valuations."},
+    "fixed_income": {"label": "Fixed Income", "description": "Bond markets and fixed income. Track G-Sec yields, RBI policy and debt market trends."},
+    "commodities": {"label": "Commodities", "description": "Commodity markets overview. Track MCX, agricultural commodities and industrial metals."},
+}
+
+
 @app.get("/api/node/{node_id}/news", response_model=List[NewsItem])
 async def get_node_news(node_id: str, limit: int = 5):
     """
-    Get news articles related to a specific node/stock.
+    Get news articles related to a specific node/stock or sentiment topic.
     Uses Tavily API or returns mock data.
     """
+    # Check if this is a news cluster topic
+    if node_id in NEWS_CLUSTER_TOPICS:
+        topic_label = NEWS_CLUSTER_TOPICS[node_id]
+        news = await tavily_service.get_topic_news(node_id, topic_label)
+        return news[:limit]
+    
+    # Check if this is a sector
+    if node_id in SECTOR_INFO:
+        sector_label = SECTOR_INFO[node_id]["label"]
+        news = await tavily_service.get_sector_news(node_id, sector_label)
+        return news[:limit]
+    
+    # Check if this is an asset class
+    if node_id in ASSET_INFO:
+        asset_label = ASSET_INFO[node_id]["label"]
+        news = await tavily_service.get_asset_news(node_id, asset_label)
+        return news[:limit]
+    
+    # Otherwise treat as stock
     stock_info = NIFTY_50_STOCKS.get(node_id.upper(), {})
     company_name = stock_info.get("name", node_id)
     
@@ -143,6 +238,55 @@ async def get_stock_details_only(node_id: str):
     Get the stock details (price, change, etc.) for a node.
     Uses Tavily API to fetch real-time stock prices when available.
     """
+    # Check if this is a news cluster topic
+    if node_id in NEWS_CLUSTER_TOPICS:
+        topic_label = NEWS_CLUSTER_TOPICS[node_id]
+        topic_descriptions = {
+            "fed_sentiment": "Federal Reserve policy decisions and their impact on Indian markets. Track interest rate changes, monetary policy shifts, and global liquidity trends.",
+            "market_mood": "Overall sentiment in Indian equity markets. Gauge investor confidence, FII/DII flows, and market breadth indicators.",
+            "global_risk": "Geopolitical tensions, trade conflicts, and global economic risks affecting emerging markets and India specifically.",
+            "earnings_season": "Corporate earnings results from Nifty 50 and broader market companies. Track revenue growth, profit margins, and guidance.",
+            "inflation_watch": "India's inflation trends, RBI monetary policy decisions, and their impact on interest rates and equity valuations.",
+        }
+        return StockDetail(
+            price=0,
+            change=0,
+            changePercent=0,
+            volume="N/A",
+            marketCap="N/A",
+            sparkline=[0] * 8,
+            signal="neutral",
+            description=topic_descriptions.get(node_id, f"News and analysis about {topic_label}"),
+        )
+    
+    # Check if this is a sector
+    if node_id in SECTOR_INFO:
+        sector_info = SECTOR_INFO[node_id]
+        return StockDetail(
+            price=0,
+            change=0,
+            changePercent=0,
+            volume="N/A",
+            marketCap="N/A",
+            sparkline=[0] * 8,
+            signal="neutral",
+            description=sector_info["description"],
+        )
+    
+    # Check if this is an asset class
+    if node_id in ASSET_INFO:
+        asset_info = ASSET_INFO[node_id]
+        return StockDetail(
+            price=0,
+            change=0,
+            changePercent=0,
+            volume="N/A",
+            marketCap="N/A",
+            sparkline=[0] * 8,
+            signal="neutral",
+            description=asset_info["description"],
+        )
+    
     # Get base details from qdrant service
     details = qdrant_service.get_stock_details(node_id)
     
@@ -323,6 +467,152 @@ async def get_similar_nodes(node_id: str, limit: int = 5):
     """
     similar = qdrant_service.search_similar_stocks(node_id, limit)
     return {"similar": similar}
+
+
+# =============================================================================
+# Topic Mapping Endpoints
+# =============================================================================
+
+@app.get("/api/topics", response_model=TopicsResponse)
+async def get_active_topics(max_topics: int = 10):
+    """
+    Fetch latest news, cluster into topics, and return topic mappings.
+    This powers the dynamic news-driven layer of the wordmap.
+    """
+    try:
+        # Fetch latest market news
+        news_items = await tavily_service.search_news(
+            "India stock market Nifty Sensex financial news",
+            max_results=30
+        )
+        
+        # Also fetch sector-specific news
+        sector_news = await tavily_service.search_news(
+            "India banking IT pharma auto energy sector news",
+            max_results=20
+        )
+        
+        # Combine news
+        all_news = []
+        seen_titles = set()
+        for item in news_items + sector_news:
+            if item.title not in seen_titles:
+                seen_titles.add(item.title)
+                all_news.append({
+                    "title": item.title,
+                    "snippet": item.snippet,
+                    "sentiment": item.sentiment,
+                    "url": item.url,
+                })
+        
+        # Cluster into topics
+        topics = topic_mapper.cluster_headlines_into_topics(all_news, max_topics=max_topics)
+        
+        # Get highlights and edges
+        highlights_dict = topic_mapper.get_highlighted_nodes(topics)
+        topic_edges = topic_mapper.get_topic_edges(topics)
+        
+        # Convert to response format
+        response_topics = []
+        for topic in topics:
+            response_topics.append(NewsTopicSchema(
+                id=topic.id,
+                name=topic.name,
+                headlines=[TopicHeadline(
+                    title=h["title"],
+                    snippet=h.get("snippet", ""),
+                    sentiment=h.get("sentiment", "neutral"),
+                    url=h.get("url"),
+                ) for h in topic.headlines[:5]],
+                sentiment_score=topic.sentiment_score,
+                sentiment=topic.sentiment,
+                linked_entities=topic.linked_entities,
+                headline_count=topic.headline_count,
+            ))
+        
+        response_highlights = []
+        for node_id, data in highlights_dict.items():
+            response_highlights.append(NodeHighlight(
+                node_id=node_id,
+                topics=data["topics"],
+                sentiment=data["sentiment"],
+                sentiment_score=data["sentiment_score"],
+                intensity=data["intensity"],
+                headline_count=data["headline_count"],
+            ))
+        
+        response_edges = []
+        for edge in topic_edges:
+            response_edges.append(TopicEdge(
+                source=edge["source"],
+                target=edge["target"],
+                weight=edge["weight"],
+                sentiment=edge["sentiment"],
+            ))
+        
+        return TopicsResponse(
+            topics=response_topics,
+            highlights=response_highlights,
+            topic_edges=response_edges,
+        )
+        
+    except Exception as e:
+        print(f"Error fetching topics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/topics/{topic_id}/news", response_model=List[NewsItem])
+async def get_topic_news(topic_id: str, limit: int = 5):
+    """
+    Get news articles for a specific topic.
+    """
+    # Map topic IDs to search queries
+    topic_queries = {
+        "topic_sector_energy": "India energy sector oil gas stocks news",
+        "topic_sector_banking": "India banking sector HDFC ICICI SBI news",
+        "topic_sector_it": "India IT sector TCS Infosys Wipro news",
+        "topic_crude_oil": "crude oil prices India impact energy stocks",
+        "topic_gold": "gold prices India MCX bullion news",
+        "topic_usd_inr": "rupee dollar exchange rate RBI forex news",
+        "topic_nifty50": "Nifty 50 Sensex India stock market news",
+    }
+    
+    # Clean up topic_id to match our keys
+    query = topic_queries.get(topic_id)
+    
+    if not query:
+        # Try to extract entity from topic_id
+        entity = topic_id.replace("topic_", "")
+        if entity in NIFTY_50_STOCKS:
+            company_name = NIFTY_50_STOCKS[entity]["name"]
+            query = f"{company_name} stock news India"
+        else:
+            query = f"{entity.replace('_', ' ')} India financial news"
+    
+    news = await tavily_service.search_news(query, max_results=limit)
+    return news
+
+
+@app.get("/api/graph/walk/{node_id}")
+async def walk_graph_from_node(node_id: str, max_hops: int = 2):
+    """
+    Walk the knowledge graph starting from a node and return all connected entities.
+    """
+    connected = topic_mapper.expand_entities_through_graph([node_id], max_hops=max_hops)
+    
+    # Get node details for each connected entity
+    result = []
+    for entity_id in connected:
+        node = topic_mapper.nodes.get(entity_id)
+        if node:
+            result.append({
+                "id": node.id,
+                "label": node.label,
+                "type": node.node_type,
+                "sector": node.sector,
+            })
+    
+    return {"starting_node": node_id, "connected_nodes": result, "hops": max_hops}
 
 
 if __name__ == "__main__":

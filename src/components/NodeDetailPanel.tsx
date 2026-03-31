@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, TrendingUp, TrendingDown, Minus, Loader2, FileText, Newspaper, ExternalLink } from 'lucide-react';
 import { type MapNode, type ClusterType, type NewsItem, type DocumentChunk } from '@/types';
@@ -32,51 +33,42 @@ interface NodeDetailPanelProps {
 }
 
 function ChunkCard({ chunk }: { chunk: DocumentChunk }) {
-  const getPdfUrl = () => {
-    if (!chunk.pdf_url) return null;
-    let url = chunk.pdf_url;
-    if (chunk.bbox) {
-      const bboxParam = `${chunk.bbox.x},${chunk.bbox.y},${chunk.bbox.w},${chunk.bbox.h}`;
-      url += url.includes('#') ? `&bbox=${bboxParam}` : `#bbox=${bboxParam}`;
-    }
-    return url;
-  };
+  const [expanded, setExpanded] = useState(false);
+  
+  const hasMoreText = chunk.text.length > 150;
 
-  const pdfUrl = getPdfUrl();
-
-  const content = (
-    <>
-      <p className="text-[10px] text-foreground/90 leading-relaxed line-clamp-3">
+  return (
+    <div 
+      className={`p-2 rounded-md bg-secondary/40 border border-border/50 transition-all cursor-pointer hover:bg-secondary/70 hover:border-primary/30 ${expanded ? 'ring-1 ring-primary/30' : ''}`}
+      onClick={() => setExpanded(!expanded)}
+    >
+      {/* Prominent date display */}
+      {chunk.date && (
+        <div className="flex items-center gap-1.5 mb-1.5 pb-1 border-b border-border/30">
+          <span className="font-mono text-[10px] font-semibold text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded">
+            {chunk.date}
+          </span>
+          {chunk.source && (
+            <span className="font-mono text-[8px] text-muted-foreground truncate">
+              {chunk.source.length > 25 ? chunk.source.substring(0, 25) + '...' : chunk.source}
+            </span>
+          )}
+        </div>
+      )}
+      <p className={`text-[10px] text-foreground/90 leading-relaxed whitespace-pre-wrap ${expanded ? '' : 'line-clamp-3'}`}>
         {chunk.text}
       </p>
       <div className="flex items-center justify-between mt-1">
         <p className="font-mono text-[8px] text-muted-foreground">
-          {chunk.source && <span>{chunk.source.length > 20 ? chunk.source.substring(0, 20) + '...' : chunk.source}</span>}
-          {chunk.source && chunk.date && <span> · </span>}
-          {chunk.date && <span>{chunk.date}</span>}
+          {!chunk.date && chunk.source && <span>{chunk.source.length > 20 ? chunk.source.substring(0, 20) + '...' : chunk.source}</span>}
           {chunk.page && <span> · P{chunk.page}</span>}
         </p>
-        {pdfUrl && <ExternalLink size={8} className="text-primary/70" />}
+        {hasMoreText && (
+          <span className="text-[8px] text-primary/60">
+            {expanded ? '▲ collapse' : '▼ expand'}
+          </span>
+        )}
       </div>
-    </>
-  );
-
-  if (pdfUrl) {
-    return (
-      <a
-        href={pdfUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block p-2 rounded-md bg-secondary/40 border border-border/50 transition-all cursor-pointer hover:bg-secondary/70 hover:border-primary/30 no-underline"
-      >
-        {content}
-      </a>
-    );
-  }
-
-  return (
-    <div className="p-2 rounded-md bg-secondary/40 border border-border/50">
-      {content}
     </div>
   );
 }
@@ -95,9 +87,11 @@ function NewsCard({ item }: { item: NewsItem }) {
       </div>
       <p className="text-[9px] text-muted-foreground leading-relaxed line-clamp-2 mb-1">{item.snippet}</p>
       <div className="flex items-center justify-between">
-        <span className="font-mono text-[8px] text-muted-foreground">
-          {item.source} · {item.time}
-        </span>
+        <div className="flex items-center gap-1">
+          <span className="font-mono text-[8px] text-muted-foreground">{item.source}</span>
+          <span className="text-muted-foreground/30">·</span>
+          <span className="font-mono text-[8px] font-medium text-primary/70">{item.time}</span>
+        </div>
         <div className="flex items-center gap-0.5">
           <SentimentIcon size={8} style={{ color: sentiment.color }} />
           <span className="font-mono text-[7px] uppercase" style={{ color: sentiment.color }}>
@@ -139,18 +133,6 @@ export default function NodeDetailPanel({ node, connectedLabels, onClose, isMobi
   const news = newsQuery.data ?? [];
   const newsLoading = newsQuery.isLoading;
   const newsError = newsQuery.error;
-
-  // Debug logging - check browser console!
-  console.log('NodeDetailPanel render:', {
-    nodeId: node.id,
-    nodeCluster: node.cluster,
-    chunksStatus: chunksQuery.status,
-    chunksLength: chunks.length,
-    chunksData: chunks,
-    chunksError: chunksError?.message,
-    newsStatus: newsQuery.status,
-    newsLength: news.length,
-  });
 
   // Loading state
   if (isLoading) {
@@ -223,11 +205,6 @@ export default function NodeDetailPanel({ node, connectedLabels, onClose, isMobi
         </div>
 
         <div className="p-4 space-y-4">
-          {/* Debug banner - remove after debugging */}
-          <div className="text-[8px] bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 p-1 rounded font-mono">
-            DEBUG: {node.id} | chunks: {chunksQuery.status} ({chunks.length}) | news: {newsQuery.status} ({news.length})
-          </div>
-
           {/* Price */}
           {detail.price > 0 && (
             <div className="flex items-baseline gap-3">

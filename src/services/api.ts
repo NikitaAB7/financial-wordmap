@@ -11,6 +11,7 @@ import type {
   MapEdge,
   MapEdgeCompat,
   DocumentChunk,
+  TopicsResponse,
 } from '@/types';
 
 // API base URL - uses Vite proxy in development
@@ -138,4 +139,33 @@ export async function fetchNodeChunks(nodeId: string, limit: number = 5): Promis
  */
 export async function fetchEdgeChunks(source: string, target: string, limit: number = 3): Promise<DocumentChunk[]> {
   return apiFetch<DocumentChunk[]>(`/edge/${encodeURIComponent(source)}/${encodeURIComponent(target)}/chunks?limit=${limit}`);
+}
+
+// =============================================================================
+// Topic Mapping APIs
+// =============================================================================
+
+/**
+ * Fetch active news topics with their graph mappings
+ */
+export async function fetchTopics(maxTopics: number = 10): Promise<TopicsResponse> {
+  return apiFetch<TopicsResponse>(`/topics?max_topics=${maxTopics}`);
+}
+
+/**
+ * Fetch news for a specific topic
+ */
+export async function fetchTopicNews(topicId: string, limit: number = 5): Promise<NewsItem[]> {
+  return apiFetch<NewsItem[]>(`/topics/${encodeURIComponent(topicId)}/news?limit=${limit}`);
+}
+
+/**
+ * Walk the knowledge graph from a node
+ */
+export async function walkGraph(nodeId: string, maxHops: number = 2): Promise<{
+  starting_node: string;
+  connected_nodes: Array<{ id: string; label: string; type: string; sector?: string }>;
+  hops: number;
+}> {
+  return apiFetch(`/graph/walk/${encodeURIComponent(nodeId)}?max_hops=${maxHops}`);
 }

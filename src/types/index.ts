@@ -69,6 +69,7 @@ export interface NewsItem {
   sentiment: SentimentType;
   snippet: string;
   url?: string;
+  published_date?: string;  // ISO format date for filtering/display
 }
 
 export interface MapDataResponse {
@@ -88,3 +89,46 @@ export interface ClusterMeta {
 }
 
 export type ClustersResponse = Record<ClusterType, ClusterMeta>;
+
+// =============================================================================
+// Topic Mapping Types
+// =============================================================================
+
+export interface TopicHeadline {
+  title: string;
+  snippet: string;
+  sentiment: SentimentType;
+  url?: string;
+}
+
+export interface NewsTopic {
+  id: string;
+  name: string;
+  headlines: TopicHeadline[];
+  sentiment_score: number;  // -1 to 1
+  sentiment: SentimentType;
+  linked_entities: string[];
+  headline_count: number;
+}
+
+export interface NodeHighlight {
+  node_id: string;
+  topics: string[];
+  sentiment: SentimentType;
+  sentiment_score: number;
+  intensity: number;  // 0-1
+  headline_count: number;
+}
+
+export interface TopicEdge {
+  source: string;
+  target: string;
+  weight: number;
+  sentiment: SentimentType;
+}
+
+export interface TopicsResponse {
+  topics: NewsTopic[];
+  highlights: NodeHighlight[];
+  topic_edges: TopicEdge[];
+}

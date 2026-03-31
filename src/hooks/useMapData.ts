@@ -8,8 +8,10 @@ import {
   fetchSimilarNodes,
   fetchNodeChunks,
   fetchEdgeChunks,
+  fetchTopics,
+  fetchTopicNews,
 } from '@/services/api';
-import type { MapNode, MapEdgeCompat, NewsItem, StockDetail, ClustersResponse, NodeDetailResponse, DocumentChunk } from '@/types';
+import type { MapNode, MapEdgeCompat, NewsItem, StockDetail, ClustersResponse, NodeDetailResponse, DocumentChunk, TopicsResponse } from '@/types';
 
 /**
  * Hook to fetch all map data (nodes and edges)
@@ -106,6 +108,36 @@ export function useEdgeChunks(source: string | null, target: string | null, limi
     queryKey: ['edgeChunks', source, target, limit],
     queryFn: () => fetchEdgeChunks(source!, target!, limit),
     enabled: !!source && !!target,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// =============================================================================
+// Topic Mapping Hooks
+// =============================================================================
+
+/**
+ * Hook to fetch active news topics and their graph mappings
+ * Refreshes every 5 minutes to capture new market developments
+ */
+export function useTopics(maxTopics: number = 10) {
+  return useQuery<TopicsResponse, Error>({
+    queryKey: ['topics', maxTopics],
+    queryFn: () => fetchTopics(maxTopics),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000, // Auto-refresh every 5 minutes
+  });
+}
+
+/**
+ * Hook to fetch news for a specific topic
+ */
+export function useTopicNews(topicId: string | null, limit: number = 5) {
+  return useQuery<NewsItem[], Error>({
+    queryKey: ['topicNews', topicId, limit],
+    queryFn: () => fetchTopicNews(topicId!, limit),
+    enabled: !!topicId,
     staleTime: 5 * 60 * 1000,
   });
 }

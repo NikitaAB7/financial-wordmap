@@ -1,12 +1,12 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { Search, X, RotateCcw, Loader2 } from 'lucide-react';
-import { type MapNode, type ClusterType } from '@/types';
+import { Search, X, RotateCcw, Loader2, Zap } from 'lucide-react';
+import { type MapNode, type ClusterType, type NodeHighlight } from '@/types';
 import NodeDetailPanel from './NodeDetailPanel';
 import { useForceLayout } from '@/hooks/useForceLayout';
 import { usePanZoom } from '@/hooks/usePanZoom';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useMapData } from '@/hooks/useMapData';
+import { useMapData, useTopics } from '@/hooks/useMapData';
 import MapEdges from './map/MapEdges';
 import MapNodes from './map/MapNodes';
 import MapTooltip from './map/MapTooltip';
@@ -39,6 +39,17 @@ export default function FinancialWordMap() {
   const { data: mapData, isLoading, error } = useMapData();
   const rawNodes = mapData?.nodes ?? [];
   const edges = mapData?.edges ?? [];
+
+  // Fetch topic highlights (news-driven dynamic layer)
+  const { data: topicsData } = useTopics(10);
+  const topicHighlights = useMemo(() => {
+    const map = new Map<string, NodeHighlight>();
+    topicsData?.highlights?.forEach(h => map.set(h.node_id, h));
+    return map;
+  }, [topicsData]);
+  
+  const activeTopics = topicsData?.topics ?? [];
+  const hasActiveTopics = activeTopics.length > 0;
 
   // Force-directed layout
   const layoutNodes = useForceLayout(rawNodes, edges);
@@ -285,6 +296,7 @@ export default function FinancialWordMap() {
             onHover={setHoveredNode}
             onClick={handleNodeClick}
             isPanning={isPanning}
+            topicHighlights={topicHighlights}
           />
         </svg>
       </div>
@@ -319,6 +331,12 @@ export default function FinancialWordMap() {
           <span>{layoutNodes.length} NODES</span>
           <span>{edges.length} CONNECTIONS</span>
           <span>4 CLUSTERS</span>
+          {hasActiveTopics && (
+            <span className="text-primary flex items-center gap-1">
+              <Zap size={9} />
+              {activeTopics.length} ACTIVE TOPICS
+            </span>
+          )}
         </div>
       )}
     </div>

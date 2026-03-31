@@ -69,6 +69,7 @@ class NewsItem(BaseModel):
     sentiment: SentimentType
     snippet: str
     url: Optional[str] = None
+    published_date: Optional[str] = None  # ISO format date for filtering/display
 
 
 class MapDataResponse(BaseModel):
@@ -88,3 +89,52 @@ class ClusterMeta(BaseModel):
     label: str
     color: str
     count: int
+
+
+# =============================================================================
+# Topic Mapping Models
+# =============================================================================
+
+class TopicHeadline(BaseModel):
+    """A headline within a news topic"""
+    title: str
+    snippet: str
+    sentiment: SentimentType
+    url: Optional[str] = None
+
+
+class NewsTopic(BaseModel):
+    """A clustered news topic with sentiment and entity links"""
+    id: str
+    name: str
+    headlines: List[TopicHeadline]
+    sentiment_score: float  # -1 to 1
+    sentiment: SentimentType
+    linked_entities: List[str]  # node IDs this topic connects to
+    headline_count: int
+
+
+class NodeHighlight(BaseModel):
+    """Highlight information for a node based on active topics"""
+    node_id: str
+    topics: List[str]
+    sentiment: SentimentType
+    sentiment_score: float
+    intensity: float  # 0-1, how strongly highlighted
+    headline_count: int
+
+
+class TopicEdge(BaseModel):
+    """Edge from a topic to an entity"""
+    source: str  # topic ID
+    target: str  # entity ID
+    weight: int  # headline count
+    sentiment: SentimentType
+
+
+class TopicsResponse(BaseModel):
+    """Response containing active topics and their graph effects"""
+    topics: List[NewsTopic]
+    highlights: List[NodeHighlight]
+    topic_edges: List[TopicEdge]
+

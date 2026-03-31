@@ -142,7 +142,7 @@ function NewsCard({ item }: { item: NewsItem }) {
         <div className="flex items-center gap-1.5">
           <span className="font-mono text-[9px] text-muted-foreground font-medium">{item.source}</span>
           <span className="text-muted-foreground/30">·</span>
-          <span className="font-mono text-[9px] text-muted-foreground">{item.time}</span>
+          <span className="font-mono text-[9px] font-semibold text-primary/80">{item.time}</span>
         </div>
         <div className="flex items-center gap-1">
           <SentimentIcon size={9} style={{ color: sentiment.color }} />

@@ -1,5 +1,6 @@
 import random
 from typing import List, Dict, Tuple, Any, Optional
+from datetime import datetime, timedelta
 from qdrant_client import QdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse
 
@@ -9,6 +10,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import QDRANT_HOST, QDRANT_PORT, QDRANT_COLLECTION, PDF_BASE_URL
 from models.schemas import MapNode, MapEdge, StockDetail, ClusterType, DocumentChunk, BoundingBox
+
+# Concall highlights must be from the last 6 months
+MAX_CHUNK_AGE_DAYS = 180
+
+# Cache for stock data to avoid repeated API calls
+_stock_cache: Dict[str, tuple] = {}
+_cache_ttl_minutes = 15
 
 # Nifty 50 stocks with their sectors
 NIFTY_50_STOCKS = {
@@ -412,6 +420,7 @@ class QdrantService:
     def get_chunks_for_node(self, node_id: str, limit: int = 5) -> List[DocumentChunk]:
         """
         Retrieve all document chunks related to a specific node.
+        Prefers chunks from the last 6 months, but shows older ones if none available.
         
         Args:
             node_id: The node ID (ticker or entity name)
@@ -427,6 +436,7 @@ class QdrantService:
             # Try to match on nested metadata.ticker
             ticker = node_id.upper()
             
+            # Get more results than needed so we can filter by date
             results, _ = self.client.scroll(
                 collection_name=QDRANT_COLLECTION,
                 scroll_filter={
@@ -435,53 +445,84 @@ class QdrantService:
                         {"key": "metadata.ticker", "match": {"value": ticker.lower()}},
                     ]
                 },
-                limit=limit,
+                limit=limit * 5,  # Get more to allow for date filtering
                 with_payload=True,
                 with_vectors=False,
             )
             
-            chunks = []
+            recent_chunks = []
+            all_chunks = []
+            cutoff_date = datetime.now() - timedelta(days=MAX_CHUNK_AGE_DAYS)
+            
             for point in results:
                 payload = point.payload or {}
                 metadata = payload.get("metadata", {})
                 text = payload.get("page_content", "") or payload.get("text", "")
+                doc_date_str = metadata.get("document_date")
                 
-                if text:
-                    # Parse bbox if available
-                    bbox_data = metadata.get("bbox")
-                    bbox = None
-                    if bbox_data and isinstance(bbox_data, dict):
-                        bbox = BoundingBox(
-                            x=bbox_data.get("x", 0),
-                            y=bbox_data.get("y", 0),
-                            w=bbox_data.get("w", 0),
-                            h=bbox_data.get("h", 0)
-                        )
-                    
-                    # Build PDF URL with page and bbox parameters
-                    source = metadata.get("source", metadata.get("document_name"))
-                    page = metadata.get("page")
-                    pdf_url = None
-                    if source:
-                        pdf_url = f"{PDF_BASE_URL}/{source}"
-                        if page:
-                            pdf_url += f"#page={page}"
-                    
-                    chunks.append(DocumentChunk(
-                        text=text[:500] + "..." if len(text) > 500 else text,
-                        source=source,
-                        date=metadata.get("document_date"),
-                        relevance_score=None,
-                        chunk_id=metadata.get("chunk_id"),
-                        chunk_type=metadata.get("chunk_type"),
-                        page=page,
-                        bbox=bbox,
-                        page_width=metadata.get("page_width"),
-                        page_height=metadata.get("page_height"),
-                        pdf_url=pdf_url
-                    ))
+                if not text:
+                    continue
+                
+                # Parse the date
+                doc_date = None
+                if doc_date_str:
+                    for fmt in ["%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d", "%d/%m/%Y", "%B %d, %Y", "%b %d, %Y"]:
+                        try:
+                            doc_date = datetime.strptime(doc_date_str, fmt)
+                            break
+                        except ValueError:
+                            continue
+                
+                # Parse bbox if available
+                bbox_data = metadata.get("bbox")
+                bbox = None
+                if bbox_data and isinstance(bbox_data, dict):
+                    bbox = BoundingBox(
+                        x=bbox_data.get("x", 0),
+                        y=bbox_data.get("y", 0),
+                        w=bbox_data.get("w", 0),
+                        h=bbox_data.get("h", 0)
+                    )
+                
+                # Build PDF URL with page and bbox parameters
+                source = metadata.get("source", metadata.get("document_name"))
+                page = metadata.get("page")
+                pdf_url = None
+                if source:
+                    pdf_url = f"{PDF_BASE_URL}/{source}"
+                    if page:
+                        pdf_url += f"#page={page}"
+                
+                # Format date for display
+                display_date = doc_date.strftime("%b %d, %Y") if doc_date else doc_date_str
+                
+                chunk = DocumentChunk(
+                    text=text[:500] + "..." if len(text) > 500 else text,
+                    source=source,
+                    date=display_date,
+                    relevance_score=None,
+                    chunk_id=metadata.get("chunk_id"),
+                    chunk_type=metadata.get("chunk_type"),
+                    page=page,
+                    bbox=bbox,
+                    page_width=metadata.get("page_width"),
+                    page_height=metadata.get("page_height"),
+                    pdf_url=pdf_url
+                )
+                
+                all_chunks.append((doc_date, chunk))
+                
+                # Track recent chunks separately
+                if doc_date and doc_date >= cutoff_date:
+                    recent_chunks.append((doc_date, chunk))
             
-            return chunks
+            # Prefer recent chunks, but fall back to all chunks if none found
+            chunks_to_use = recent_chunks if recent_chunks else all_chunks
+            
+            # Sort by date (newest first)
+            chunks_to_use.sort(key=lambda x: x[0] or datetime.min, reverse=True)
+            
+            return [chunk for _, chunk in chunks_to_use[:limit]]
             
         except Exception as e:
             print(f"Error retrieving chunks for node {node_id}: {e}")
@@ -500,7 +541,7 @@ class QdrantService:
     def get_stock_details(self, ticker: str) -> Optional[StockDetail]:
         """
         Get detailed information for a stock.
-        In production, this would query real market data APIs.
+        Uses yfinance to fetch real stock data from NSE India.
         """
         ticker_upper = ticker.upper()
         stock_info = NIFTY_50_STOCKS.get(ticker_upper)
@@ -508,7 +549,85 @@ class QdrantService:
         if not stock_info:
             return None
         
-        # Generate mock but consistent data based on ticker
+        # Check cache first
+        cache_key = f"stock:{ticker_upper}"
+        if cache_key in _stock_cache:
+            cached_time, cached_data = _stock_cache[cache_key]
+            if datetime.now() - cached_time < timedelta(minutes=_cache_ttl_minutes):
+                return cached_data
+        
+        # Try to fetch real stock data using yfinance
+        try:
+            import yfinance as yf
+            
+            # NSE stock symbols need .NS suffix
+            yf_ticker = f"{ticker_upper}.NS"
+            stock = yf.Ticker(yf_ticker)
+            
+            # Get historical data for sparkline (last 7 days)
+            hist = stock.history(period="7d")
+            
+            if not hist.empty:
+                current_price = hist['Close'].iloc[-1]
+                prev_close = hist['Close'].iloc[-2] if len(hist) > 1 else current_price
+                change = current_price - prev_close
+                change_percent = (change / prev_close) * 100 if prev_close else 0
+                
+                # Get sparkline from close prices
+                sparkline = hist['Close'].tolist()[-8:]  # Last 8 data points
+                if len(sparkline) < 8:
+                    sparkline = sparkline + [sparkline[-1]] * (8 - len(sparkline))
+                
+                # Get volume and market cap
+                info = stock.info
+                volume = info.get('volume', 0)
+                market_cap = info.get('marketCap', 0)
+                
+                # Format volume
+                if volume >= 1_000_000:
+                    volume_str = f"{volume / 1_000_000:.1f}M"
+                elif volume >= 1000:
+                    volume_str = f"{volume / 1000:.1f}K"
+                else:
+                    volume_str = str(volume)
+                
+                # Format market cap
+                if market_cap >= 1_000_000_000_000:  # Trillion
+                    mcap_str = f"₹{market_cap / 1_000_000_000_000:.1f}L Cr"
+                elif market_cap >= 10_000_000_000:  # 1000 Cr+
+                    mcap_str = f"₹{market_cap / 10_000_000_000:.0f}K Cr"
+                elif market_cap >= 100_000_000:  # 10 Cr+
+                    mcap_str = f"₹{market_cap / 100_000_000:.0f} Cr"
+                else:
+                    mcap_str = "N/A"
+                
+                # Determine signal based on real data
+                if change_percent > 1:
+                    signal = "bullish"
+                elif change_percent < -1:
+                    signal = "bearish"
+                else:
+                    signal = "neutral"
+                
+                result = StockDetail(
+                    price=round(current_price, 2),
+                    change=round(change, 2),
+                    changePercent=round(change_percent, 2),
+                    volume=volume_str,
+                    marketCap=mcap_str,
+                    sparkline=sparkline,
+                    signal=signal,
+                    description=f"{stock_info['name']} is a leading company in the {stock_info['sector']} sector, listed on NSE as part of the Nifty 50 index.",
+                )
+                
+                # Cache the result
+                _stock_cache[cache_key] = (datetime.now(), result)
+                return result
+                
+        except Exception as e:
+            print(f"Error fetching stock data for {ticker_upper}: {e}")
+        
+        # Fallback to mock data if yfinance fails
         seed = hash(ticker_upper)
         random.seed(seed)
         
