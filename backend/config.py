@@ -14,6 +14,9 @@ QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "financial_docs")
 # Tavily Configuration
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
 
+# OpenAI Configuration
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
 # Define Edge Configuration
 DEFINE_EDGE_BASE_URL = os.getenv("DEFINE_EDGE_FUNDAMENTAL_APIS_BASE_URL", "https://radar.definedgesecurities.com")
 DEFINE_EDGE_API_KEY = os.getenv("DEFINE_EDGE_API_KEY", "")

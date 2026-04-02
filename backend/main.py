@@ -22,6 +22,7 @@ from models.schemas import (
 from services.qdrant_service import qdrant_service, NIFTY_50_STOCKS
 from services.tavily_service import tavily_service
 from services.topic_mapper import topic_mapper
+from services.llm_service import llm_service
 
 
 @asynccontextmanager
@@ -331,6 +332,76 @@ async def get_node_chunks(node_id: str, limit: int = 5):
     """
     chunks = qdrant_service.get_chunks_for_node(node_id, limit)
     return chunks
+
+
+@app.get("/api/node/{node_id}/dynamic-connections")
+async def get_dynamic_connections(node_id: str, limit: int = 5):
+    """
+    Get dynamically generated connections for a node using LLM.
+    Returns intelligent connection suggestions based on current market context.
+    """
+    # Determine node type and label
+    node_label = node_id
+    node_type = "stock"
+    
+    if node_id in NEWS_CLUSTER_TOPICS:
+        node_label = NEWS_CLUSTER_TOPICS[node_id]
+        node_type = "news"
+    elif node_id in SECTOR_INFO:
+        node_label = SECTOR_INFO[node_id]["label"]
+        node_type = "sector"
+    elif node_id in ASSET_INFO:
+        node_label = ASSET_INFO[node_id]["label"]
+        node_type = "asset"
+    elif node_id.upper() in NIFTY_50_STOCKS:
+        node_label = NIFTY_50_STOCKS[node_id.upper()].get("name", node_id)
+        node_type = "stock"
+    
+    # Get recent news for context
+    recent_news = []
+    try:
+        if node_type == "news":
+            news = await tavily_service.get_topic_news(node_id, node_label)
+        elif node_type == "sector":
+            news = await tavily_service.get_sector_news(node_id, node_label)
+        elif node_type == "asset":
+            news = await tavily_service.get_asset_news(node_id, node_label)
+        else:
+            news = await tavily_service.get_stock_news(node_id, node_label)
+        recent_news = [{"title": n.title, "sentiment": n.sentiment} for n in news[:5]]
+    except Exception as e:
+        print(f"Error fetching news for context: {e}")
+    
+    # Get existing connections from graph
+    nodes = qdrant_service.build_map_nodes()
+    edges = qdrant_service.build_map_edges(nodes)
+    existing_connections = [
+        e.target if e.source == node_id else e.source
+        for e in edges
+        if e.source == node_id or e.target == node_id
+    ]
+    
+    # Generate dynamic connections
+    connections = await llm_service.generate_dynamic_connections(
+        node_id=node_id,
+        node_label=node_label,
+        node_type=node_type,
+        recent_news=recent_news,
+        existing_connections=existing_connections,
+        max_connections=limit
+    )
+    
+    # Convert to response format
+    return [
+        {
+            "target": conn.target,
+            "target_label": conn.target_label,
+            "relationship": conn.relationship,
+            "reasoning": conn.reasoning,
+            "strength": conn.strength
+        }
+        for conn in connections
+    ]
 
 
 @app.get("/api/edge/{source}/{target}/chunks", response_model=List[DocumentChunk])

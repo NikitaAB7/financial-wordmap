@@ -320,6 +320,7 @@ export default function FinancialWordMap() {
             node={selectedNodeData}
             connectedLabels={selectedConnectedLabels}
             onClose={() => setSelectedNode(null)}
+            onNodeNavigate={(nodeId) => setSelectedNode(nodeId)}
             isMobile={isMobile}
           />
         )}

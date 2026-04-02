@@ -132,3 +132,15 @@ export interface TopicsResponse {
   highlights: NodeHighlight[];
   topic_edges: TopicEdge[];
 }
+
+// =============================================================================
+// Dynamic Connections Types
+// =============================================================================
+
+export interface DynamicConnection {
+  target: string;
+  target_label: string;
+  relationship: string;
+  reasoning: string;
+  strength: number;  // 0-1
+}

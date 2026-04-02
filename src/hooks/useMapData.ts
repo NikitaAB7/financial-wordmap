@@ -10,8 +10,9 @@ import {
   fetchEdgeChunks,
   fetchTopics,
   fetchTopicNews,
+  fetchDynamicConnections,
 } from '@/services/api';
-import type { MapNode, MapEdgeCompat, NewsItem, StockDetail, ClustersResponse, NodeDetailResponse, DocumentChunk, TopicsResponse } from '@/types';
+import type { MapNode, MapEdgeCompat, NewsItem, StockDetail, ClustersResponse, NodeDetailResponse, DocumentChunk, TopicsResponse, DynamicConnection } from '@/types';
 
 /**
  * Hook to fetch all map data (nodes and edges)
@@ -139,5 +140,23 @@ export function useTopicNews(topicId: string | null, limit: number = 5) {
     queryFn: () => fetchTopicNews(topicId!, limit),
     enabled: !!topicId,
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+// =============================================================================
+// Dynamic Connections Hooks
+// =============================================================================
+
+/**
+ * Hook to fetch dynamically generated connections for a node
+ * Uses LLM to suggest intelligent connections based on market context
+ */
+export function useDynamicConnections(nodeId: string | null, limit: number = 5) {
+  return useQuery<DynamicConnection[], Error>({
+    queryKey: ['dynamicConnections', nodeId, limit],
+    queryFn: () => fetchDynamicConnections(nodeId!, limit),
+    enabled: false, // Only fetch when manually triggered
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 5 * 60 * 1000,
   });
 }

@@ -12,6 +12,7 @@ import type {
   MapEdgeCompat,
   DocumentChunk,
   TopicsResponse,
+  DynamicConnection,
 } from '@/types';
 
 // API base URL - uses Vite proxy in development
@@ -168,4 +169,11 @@ export async function walkGraph(nodeId: string, maxHops: number = 2): Promise<{
   hops: number;
 }> {
   return apiFetch(`/graph/walk/${encodeURIComponent(nodeId)}?max_hops=${maxHops}`);
+}
+
+/**
+ * Fetch dynamic connections for a node (LLM-generated)
+ */
+export async function fetchDynamicConnections(nodeId: string, limit: number = 5): Promise<DynamicConnection[]> {
+  return apiFetch<DynamicConnection[]>(`/node/${encodeURIComponent(nodeId)}/dynamic-connections?limit=${limit}`);
 }

@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, TrendingUp, TrendingDown, Minus, Loader2, FileText, Newspaper, ExternalLink } from 'lucide-react';
-import { type MapNode, type ClusterType, type NewsItem, type DocumentChunk } from '@/types';
+import { X, TrendingUp, TrendingDown, Minus, Loader2, FileText, Newspaper, ExternalLink, Sparkles, ArrowRight, Zap } from 'lucide-react';
+import { type MapNode, type ClusterType, type NewsItem, type DocumentChunk, type DynamicConnection } from '@/types';
 import { useStockDetails, useNodeChunks, useNodeNews } from '@/hooks/useMapData';
+import { fetchDynamicConnections } from '@/services/api';
 
 // Static cluster metadata
 const clusterMeta: Record<ClusterType, { label: string }> = {
@@ -29,6 +30,7 @@ interface NodeDetailPanelProps {
   node: MapNode;
   connectedLabels: string[];
   onClose: () => void;
+  onNodeNavigate?: (nodeId: string) => void;
   isMobile?: boolean;
 }
 
@@ -122,10 +124,15 @@ function NewsCard({ item }: { item: NewsItem }) {
   );
 }
 
-export default function NodeDetailPanel({ node, connectedLabels, onClose, isMobile }: NodeDetailPanelProps) {
+export default function NodeDetailPanel({ node, connectedLabels, onClose, onNodeNavigate, isMobile }: NodeDetailPanelProps) {
   const { data: detail, isLoading, error } = useStockDetails(node.id);
   const chunksQuery = useNodeChunks(node.id, 5);
   const newsQuery = useNodeNews(node.id, 5);
+  
+  // Dynamic connections state
+  const [dynamicConnections, setDynamicConnections] = useState<DynamicConnection[]>([]);
+  const [isLoadingConnections, setIsLoadingConnections] = useState(false);
+  const [connectionsError, setConnectionsError] = useState<string | null>(null);
   
   const chunks = chunksQuery.data ?? [];
   const chunksLoading = chunksQuery.isLoading;
@@ -133,6 +140,28 @@ export default function NodeDetailPanel({ node, connectedLabels, onClose, isMobi
   const news = newsQuery.data ?? [];
   const newsLoading = newsQuery.isLoading;
   const newsError = newsQuery.error;
+  
+  // Function to discover dynamic connections
+  const handleDiscoverConnections = async () => {
+    setIsLoadingConnections(true);
+    setConnectionsError(null);
+    try {
+      const connections = await fetchDynamicConnections(node.id, 5);
+      setDynamicConnections(connections);
+    } catch (err) {
+      setConnectionsError('Failed to discover connections');
+      console.error('Error fetching dynamic connections:', err);
+    } finally {
+      setIsLoadingConnections(false);
+    }
+  };
+  
+  // Handle navigation to connected node
+  const handleConnectionClick = (targetId: string) => {
+    if (onNodeNavigate) {
+      onNodeNavigate(targetId);
+    }
+  };
 
   // Loading state
   if (isLoading) {
@@ -401,7 +430,7 @@ export default function NodeDetailPanel({ node, connectedLabels, onClose, isMobi
 
         {/* Connections */}
         {connectedLabels.length > 0 && (
-          <div className="px-4 py-3">
+          <div className="px-4 py-3 border-b border-border">
             <p className="font-mono text-[9px] text-muted-foreground tracking-wider mb-1.5">CONNECTIONS</p>
             <div className="flex flex-wrap gap-1">
               {connectedLabels.map((label, i) => (
@@ -410,6 +439,91 @@ export default function NodeDetailPanel({ node, connectedLabels, onClose, isMobi
             </div>
           </div>
         )}
+        
+        {/* Dynamic Connections - AI Discover */}
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5">
+              <Sparkles size={11} className="text-amber-500" />
+              <p className="font-mono text-[9px] text-muted-foreground tracking-wider">DISCOVER CONNECTIONS</p>
+            </div>
+          </div>
+          
+          {dynamicConnections.length === 0 && !isLoadingConnections && !connectionsError && (
+            <button
+              onClick={handleDiscoverConnections}
+              className="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 hover:border-amber-500/50 transition-all group"
+            >
+              <div className="flex items-center justify-center gap-2">
+                <Sparkles size={14} className="text-amber-500 group-hover:animate-pulse" />
+                <span className="font-mono text-[10px] text-amber-500/90">Click to discover AI-powered connections</span>
+              </div>
+            </button>
+          )}
+          
+          {isLoadingConnections && (
+            <div className="flex items-center justify-center py-4">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
+                <span className="font-mono text-[10px] text-muted-foreground">AI analyzing connections...</span>
+              </div>
+            </div>
+          )}
+          
+          {connectionsError && (
+            <div className="text-center py-2">
+              <p className="text-[10px] text-destructive mb-2">{connectionsError}</p>
+              <button
+                onClick={handleDiscoverConnections}
+                className="text-[10px] text-amber-500 hover:underline"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+          
+          {dynamicConnections.length > 0 && (
+            <div className="space-y-2">
+              {dynamicConnections.map((conn, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  onClick={() => handleConnectionClick(conn.target)}
+                  className="p-2.5 rounded-lg bg-gradient-to-r from-amber-500/5 to-orange-500/5 border border-amber-500/20 hover:border-amber-500/40 cursor-pointer transition-all group"
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[10px] font-semibold text-foreground">{conn.target_label}</span>
+                      <span className="font-mono text-[8px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600">
+                        {conn.relationship.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <ArrowRight size={12} className="text-amber-500/50 group-hover:text-amber-500 group-hover:translate-x-0.5 transition-all" />
+                  </div>
+                  <p className="text-[9px] text-muted-foreground leading-relaxed">{conn.reasoning}</p>
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    <Zap size={9} className="text-amber-500/70" />
+                    <div className="flex-1 h-1 bg-secondary rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full"
+                        style={{ width: `${conn.strength * 100}%` }}
+                      />
+                    </div>
+                    <span className="font-mono text-[8px] text-muted-foreground">{Math.round(conn.strength * 100)}%</span>
+                  </div>
+                </motion.div>
+              ))}
+              <button
+                onClick={handleDiscoverConnections}
+                className="w-full mt-2 py-1.5 text-[9px] text-amber-500/70 hover:text-amber-500 transition-colors"
+              >
+                ↻ Refresh connections
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Footer */}
