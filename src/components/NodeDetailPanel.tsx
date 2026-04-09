@@ -31,18 +31,28 @@ interface NodeDetailPanelProps {
   connectedLabels: string[];
   onClose: () => void;
   onNodeNavigate?: (nodeId: string) => void;
+  onChunkClick?: (chunk: DocumentChunk) => void;
   isMobile?: boolean;
 }
 
-function ChunkCard({ chunk }: { chunk: DocumentChunk }) {
+function ChunkCard({ chunk, onChunkClick }: { chunk: DocumentChunk; onChunkClick?: (chunk: DocumentChunk) => void }) {
   const [expanded, setExpanded] = useState(false);
-  
+
   const hasMoreText = chunk.text.length > 150;
+  const canOpenPdf = !!chunk.source && !!onChunkClick;
+
+  const handleCardClick = () => {
+    if (canOpenPdf) {
+      onChunkClick!(chunk);
+    } else {
+      setExpanded(!expanded);
+    }
+  };
 
   return (
-    <div 
+    <div
       className={`p-2 rounded-md bg-secondary/40 border border-border/50 transition-all cursor-pointer hover:bg-secondary/70 hover:border-primary/30 ${expanded ? 'ring-1 ring-primary/30' : ''}`}
-      onClick={() => setExpanded(!expanded)}
+      onClick={handleCardClick}
     >
       {/* Prominent date display */}
       {chunk.date && (
@@ -66,9 +76,12 @@ function ChunkCard({ chunk }: { chunk: DocumentChunk }) {
           {chunk.page && <span> · P{chunk.page}</span>}
         </p>
         {hasMoreText && (
-          <span className="text-[8px] text-primary/60">
+          <button
+            onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+            className="text-[8px] text-primary/60 hover:text-primary"
+          >
             {expanded ? '▲ collapse' : '▼ expand'}
-          </span>
+          </button>
         )}
       </div>
     </div>
@@ -124,7 +137,7 @@ function NewsCard({ item }: { item: NewsItem }) {
   );
 }
 
-export default function NodeDetailPanel({ node, connectedLabels, onClose, onNodeNavigate, isMobile }: NodeDetailPanelProps) {
+export default function NodeDetailPanel({ node, connectedLabels, onClose, onNodeNavigate, onChunkClick, isMobile }: NodeDetailPanelProps) {
   const { data: detail, isLoading, error } = useStockDetails(node.id);
   const chunksQuery = useNodeChunks(node.id, 5);
   const newsQuery = useNodeNews(node.id, 5);
@@ -281,7 +294,7 @@ export default function NodeDetailPanel({ node, connectedLabels, onClose, onNode
               <Loader2 className="w-4 h-4 animate-spin text-muted-foreground mx-auto" />
             ) : chunks.length > 0 ? (
               <div className="space-y-2">
-                {chunks.slice(0, 2).map((chunk, i) => <ChunkCard key={i} chunk={chunk} />)}
+                {chunks.slice(0, 2).map((chunk, i) => <ChunkCard key={i} chunk={chunk} onChunkClick={onChunkClick} />)}
               </div>
             ) : (
               <p className="text-[10px] text-muted-foreground/60 text-center py-1">No highlights available</p>
@@ -421,7 +434,7 @@ export default function NodeDetailPanel({ node, connectedLabels, onClose, onNode
             </div>
           ) : chunks.length > 0 ? (
             <div className="space-y-2">
-              {chunks.map((chunk, i) => <ChunkCard key={i} chunk={chunk} />)}
+              {chunks.map((chunk, i) => <ChunkCard key={i} chunk={chunk} onChunkClick={onChunkClick} />)}
             </div>
           ) : (
             <p className="text-[10px] text-muted-foreground/60 text-center py-2">No highlights available (0 chunks)</p>
