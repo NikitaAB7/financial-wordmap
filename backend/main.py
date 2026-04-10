@@ -433,47 +433,35 @@ async def get_edge_chunks(source: str, target: str, limit: int = 3):
 
 
 @app.get("/api/pdf/{filename:path}")
-async def get_pdf(filename: str, page: int = None):
+async def get_pdf(filename: str, category: str = "concall", page: int = None):
     """
-    Proxy PDF files from Define Edge API.
-    This endpoint fetches the PDF and serves it to the client.
+    Proxy PDF files from Define Edge fundamentals API
+    (/v1/data-feed/getFileByCategoryAndAttachmentName).
     """
     if not DEFINE_EDGE_API_KEY:
         raise HTTPException(status_code=500, detail="Define Edge API key not configured")
-    
-    # Construct the Define Edge URL for the PDF
-    # Try different possible endpoints
-    possible_urls = [
-        f"{DEFINE_EDGE_BASE_URL}/api/v1/files/{filename}",
-        f"{DEFINE_EDGE_BASE_URL}/files/{filename}",
-        f"{DEFINE_EDGE_BASE_URL}/documents/{filename}",
-        f"{DEFINE_EDGE_BASE_URL}/pdfs/{filename}",
-    ]
-    
-    headers = {
-        "Authorization": f"Bearer {DEFINE_EDGE_API_KEY}",
-        "X-API-Key": DEFINE_EDGE_API_KEY,
-    }
-    
+
+    url = f"{DEFINE_EDGE_BASE_URL}/v1/data-feed/getFileByCategoryAndAttachmentName"
+    params = {"subcatname": category, "attachmentName": filename}
+    headers = {"apiKey": DEFINE_EDGE_API_KEY}
+
     async with httpx.AsyncClient(timeout=30.0) as client:
-        for url in possible_urls:
-            try:
-                response = await client.get(url, headers=headers, follow_redirects=True)
-                if response.status_code == 200:
-                    # Check if it's actually a PDF
-                    content_type = response.headers.get("content-type", "")
-                    if "pdf" in content_type.lower() or filename.endswith(".pdf"):
-                        return StreamingResponse(
-                            iter([response.content]),
-                            media_type="application/pdf",
-                            headers={
-                                "Content-Disposition": f"inline; filename={filename}",
-                            }
-                        )
-            except Exception:
-                continue
-    
-    raise HTTPException(status_code=404, detail=f"PDF not found: {filename}")
+        try:
+            response = await client.get(url, params=params, headers=headers, follow_redirects=True)
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Upstream request failed: {e}")
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"Define Edge returned {response.status_code} for {filename}",
+            )
+
+        return StreamingResponse(
+            iter([response.content]),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"inline; filename={filename}"},
+        )
 
 
 @app.get("/api/clusters", response_model=Dict[str, ClusterMeta])

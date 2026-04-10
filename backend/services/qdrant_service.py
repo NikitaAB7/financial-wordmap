@@ -503,6 +503,7 @@ class QdrantService:
                     relevance_score=None,
                     chunk_id=metadata.get("chunk_id"),
                     chunk_type=metadata.get("chunk_type"),
+                    category=metadata.get("category"),
                     page=page,
                     bbox=bbox,
                     page_width=metadata.get("page_width"),
