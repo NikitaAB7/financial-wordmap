@@ -38,6 +38,12 @@ function ChunkCard({ chunk }: { chunk: DocumentChunk }) {
   const [expanded, setExpanded] = useState(false);
   
   const hasMoreText = chunk.text.length > 150;
+  const hasPdf = Boolean(chunk.pdf_url);
+  const pdfSrc = chunk.pdf_url
+    ? (chunk.pdf_url.includes('#')
+        ? chunk.pdf_url
+        : `${chunk.pdf_url}${chunk.page ? `#page=${chunk.page}` : ''}`)
+    : null;
 
   return (
     <div 
@@ -60,6 +66,28 @@ function ChunkCard({ chunk }: { chunk: DocumentChunk }) {
       <p className={`text-[10px] text-foreground/90 leading-relaxed whitespace-pre-wrap ${expanded ? '' : 'line-clamp-3'}`}>
         {chunk.text}
       </p>
+
+      {expanded && hasPdf && pdfSrc && (
+        <div className="mt-2 space-y-1">
+          <div className="overflow-hidden rounded-md border border-border/50 bg-background/40">
+            <iframe
+              title="Concall highlight PDF"
+              src={pdfSrc}
+              className="w-full h-64"
+            />
+          </div>
+          <a
+            href={chunk.pdf_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1 text-[9px] text-primary/80 hover:underline"
+          >
+            <ExternalLink size={10} />
+            Open PDF
+          </a>
+        </div>
+      )}
       <div className="flex items-center justify-between mt-1">
         <p className="font-mono text-[8px] text-muted-foreground">
           {!chunk.date && chunk.source && <span>{chunk.source.length > 20 ? chunk.source.substring(0, 20) + '...' : chunk.source}</span>}

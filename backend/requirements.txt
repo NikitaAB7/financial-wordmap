@@ -7,3 +7,5 @@ httpx==0.26.0
 pydantic==2.5.3
 yfinance>=0.2.36
 openai>=1.0.0
+transformers>=4.36.0
+torch>=2.1.0

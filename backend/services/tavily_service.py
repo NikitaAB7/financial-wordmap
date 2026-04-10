@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import TAVILY_API_KEY
 from models.schemas import NewsItem, SentimentType
+from services.finbert_service import finbert_service
 
 # Cache for news results to avoid excessive API calls
 _news_cache: dict = {}
@@ -157,30 +158,10 @@ class TavilyService:
 
     def _analyze_sentiment(self, text: str) -> SentimentType:
         """
-        Simple rule-based sentiment analysis.
-        In production, use an ML model or sentiment API.
+        Analyze sentiment using FinBERT model.
+        Falls back to rule-based analysis if FinBERT is unavailable.
         """
-        text_lower = text.lower()
-        
-        positive_words = [
-            "rise", "gain", "up", "surge", "rally", "growth", "profit",
-            "bullish", "outperform", "upgrade", "strong", "positive",
-            "beat", "exceed", "record", "high", "boost", "optimistic"
-        ]
-        negative_words = [
-            "fall", "drop", "down", "decline", "loss", "crash", "plunge",
-            "bearish", "underperform", "downgrade", "weak", "negative",
-            "miss", "concern", "risk", "low", "cut", "pessimistic", "warning"
-        ]
-        
-        pos_count = sum(1 for word in positive_words if word in text_lower)
-        neg_count = sum(1 for word in negative_words if word in text_lower)
-        
-        if pos_count > neg_count + 1:
-            return "positive"
-        elif neg_count > pos_count + 1:
-            return "negative"
-        return "neutral"
+        return finbert_service.analyze_sentiment(text)
 
     def _extract_domain(self, url: str) -> str:
         """Extract domain name from URL"""

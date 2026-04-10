@@ -86,7 +86,8 @@ class LLMService:
         node_type: str,  # 'stock', 'sector', 'asset', 'news'
         recent_news: List[Dict[str, Any]],
         existing_connections: List[str],
-        max_connections: int = 5
+        max_connections: int = 5,
+        all_nodes: Optional[Dict[str, str]] = None
     ) -> List[DynamicConnection]:
         """
         Generate dynamic connections for a node based on current context.
@@ -98,6 +99,7 @@ class LLMService:
             recent_news: Recent news headlines for context
             existing_connections: Already connected node IDs
             max_connections: Maximum number of connections to generate
+            all_nodes: Dict mapping node_id to label for all nodes in the graph
             
         Returns:
             List of DynamicConnection objects
@@ -112,9 +114,12 @@ class LLMService:
             for item in recent_news[:5]
         ]) if recent_news else "No recent news available."
         
+        # Use provided node list or fall back to hardcoded list
+        node_mapping = all_nodes if all_nodes else self.node_labels
+        
         # Build available nodes list (exclude already connected)
         available_nodes = {
-            k: v for k, v in self.node_labels.items()
+            k: v for k, v in node_mapping.items()
             if k not in existing_connections and k != node_id
         }
         
@@ -184,8 +189,8 @@ Return ONLY a JSON array with exactly {max_connections} connections. Example for
                         reasoning=item.get("reasoning", ""),
                         strength=float(item.get("strength", 0.5))
                     )
-                    # Validate target exists
-                    if conn.target in self.node_labels or conn.target in available_nodes:
+                    # Validate target exists in the provided node mapping
+                    if conn.target in node_mapping or conn.target in available_nodes:
                         connections.append(conn)
                 except (KeyError, ValueError) as e:
                     print(f"Error parsing connection: {e}")

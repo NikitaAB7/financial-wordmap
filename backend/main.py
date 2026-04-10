@@ -1,11 +1,12 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Dict, List
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 import httpx
 
-from config import API_HOST, API_PORT, DEFINE_EDGE_BASE_URL, DEFINE_EDGE_API_KEY
+from config import API_HOST, API_PORT, DEFINE_EDGE_BASE_URL, DEFINE_EDGE_API_KEY, PDF_LOCAL_DIR
 from models.schemas import (
     MapDataResponse,
     NodeDetailResponse,
@@ -23,6 +24,7 @@ from services.qdrant_service import qdrant_service, NIFTY_50_STOCKS
 from services.tavily_service import tavily_service
 from services.topic_mapper import topic_mapper
 from services.llm_service import llm_service
+from services.finbert_service import finbert_service
 
 
 @asynccontextmanager
@@ -43,6 +45,12 @@ async def lifespan(app: FastAPI):
         print("✓ Tavily API configured")
     else:
         print("✗ Tavily API not configured - using mock news")
+    
+    # Check FinBERT availability
+    if finbert_service.is_available():
+        print("✓ FinBERT sentiment model loaded")
+    else:
+        print("✗ FinBERT unavailable - using rule-based sentiment")
     
     yield
     
@@ -75,6 +83,7 @@ async def root():
         "service": "Financial WordMap API",
         "qdrant_connected": qdrant_service.is_connected(),
         "tavily_configured": tavily_service.is_configured(),
+        "finbert_available": finbert_service.is_available(),
     }
 
 
@@ -329,9 +338,76 @@ async def get_node_chunks(node_id: str, limit: int = 5):
     """
     Get document chunks from Qdrant related to a specific node.
     These are the source documents that support the node's connections.
+    Falls back to mock data when Qdrant is not connected.
     """
     chunks = qdrant_service.get_chunks_for_node(node_id, limit)
+    
+    # If no chunks and Qdrant isn't connected, return mock data
+    if not chunks and not qdrant_service.is_connected():
+        chunks = _get_mock_chunks(node_id, limit)
+    
     return chunks
+
+
+def _get_mock_chunks(node_id: str, limit: int = 5) -> List[DocumentChunk]:
+    """Generate mock document chunks for demo purposes when Qdrant is unavailable."""
+    from datetime import datetime, timedelta
+    
+    ticker = node_id.upper()
+    stock_info = NIFTY_50_STOCKS.get(ticker)
+    now = datetime.now()
+    
+    # Generate recent dates
+    def fmt_date(days_ago: int) -> str:
+        return (now - timedelta(days=days_ago)).strftime("%b %d, %Y")
+    
+    if not stock_info:
+        # For non-stock nodes, return generic chunks
+        return [
+            DocumentChunk(
+                text=f"This is a sample document chunk related to {node_id}. In production, this would contain actual concall transcripts, earnings reports, or analyst commentary retrieved from the vector database.",
+                source="Sample Document",
+                date=fmt_date(5),
+            )
+        ]
+    
+    company_name = stock_info["name"]
+    sector = stock_info["sector"]
+    
+    mock_chunks = [
+        DocumentChunk(
+            text=f"Q4 FY26 Earnings Call - {company_name}: Management highlighted strong revenue growth of 18% YoY driven by robust demand across all business segments. The {sector} sector continues to show resilience despite global headwinds.",
+            source=f"{ticker}_Q4FY26_Concall.pdf",
+            date=fmt_date(2),
+            page=12,
+        ),
+        DocumentChunk(
+            text=f"Analyst Report - {company_name}: We maintain our BUY rating with a target price revision. Key catalysts include capacity expansion in the {sector} segment and margin improvement initiatives expected to materialize in H2 FY27.",
+            source=f"{ticker}_Analyst_Report.pdf",
+            date=fmt_date(5),
+            page=3,
+        ),
+        DocumentChunk(
+            text=f"Board Meeting Outcome - {company_name}: The Board approved interim dividend of Rs 15 per share and discussed strategic investments in new growth areas. Management remains optimistic about the {sector} outlook for FY27.",
+            source=f"{ticker}_Board_Meeting.pdf",
+            date=fmt_date(10),
+            page=1,
+        ),
+        DocumentChunk(
+            text=f"Industry Analysis - {sector} Sector: Market share dynamics continue to evolve with {company_name} maintaining leadership position. Competitive intensity remains moderate with focus shifting to value-added products.",
+            source=f"{sector}_Industry_Report_Q4FY26.pdf",
+            date=fmt_date(15),
+            page=24,
+        ),
+        DocumentChunk(
+            text=f"Management Commentary - {company_name}: 'We are well positioned to capture growth opportunities in the evolving {sector} landscape. Our investments in technology and talent will drive sustainable competitive advantage.' - CEO",
+            source=f"{ticker}_Investor_Day_2026.pdf",
+            date=fmt_date(25),
+            page=8,
+        ),
+    ]
+    
+    return mock_chunks[:limit]
 
 
 @app.get("/api/node/{node_id}/dynamic-connections")
@@ -381,6 +457,9 @@ async def get_dynamic_connections(node_id: str, limit: int = 5):
         if e.source == node_id or e.target == node_id
     ]
     
+    # Build full node mapping (id -> label) for LLM context
+    all_nodes_map = {n.id: n.label for n in nodes}
+    
     # Generate dynamic connections
     connections = await llm_service.generate_dynamic_connections(
         node_id=node_id,
@@ -388,7 +467,8 @@ async def get_dynamic_connections(node_id: str, limit: int = 5):
         node_type=node_type,
         recent_news=recent_news,
         existing_connections=existing_connections,
-        max_connections=limit
+        max_connections=limit,
+        all_nodes=all_nodes_map
     )
     
     # Convert to response format
@@ -433,22 +513,46 @@ async def get_edge_chunks(source: str, target: str, limit: int = 3):
 
 
 @app.get("/api/pdf/{filename:path}")
-async def get_pdf(filename: str, page: int = None):
+async def get_pdf(filename: str, request: Request, page: int = None):
     """
     Proxy PDF files from Define Edge API.
     This endpoint fetches the PDF and serves it to the client.
     """
+    # 1) Try local filesystem first (optional)
+    safe_name = Path(filename).name
+    local_path = PDF_LOCAL_DIR / safe_name
+    if local_path.exists() and local_path.is_file():
+        return FileResponse(
+            path=str(local_path),
+            media_type="application/pdf",
+            filename=safe_name,
+            headers={"Content-Disposition": f"inline; filename={safe_name}"},
+        )
+
+    # 2) Fall back to proxying from Define Edge (if configured)
     if not DEFINE_EDGE_API_KEY:
-        raise HTTPException(status_code=500, detail="Define Edge API key not configured")
+        accept = (request.headers.get("accept") or "").lower()
+        if "text/html" in accept:
+            return HTMLResponse(
+                status_code=404,
+                content=f"<html><body><h3>PDF not found</h3><p>{safe_name}</p></body></html>",
+            )
+        raise HTTPException(status_code=404, detail=f"PDF not found: {safe_name}")
     
-    # Construct the Define Edge URL for the PDF
-    # Try different possible endpoints
-    possible_urls = [
-        f"{DEFINE_EDGE_BASE_URL}/api/v1/files/{filename}",
-        f"{DEFINE_EDGE_BASE_URL}/files/{filename}",
-        f"{DEFINE_EDGE_BASE_URL}/documents/{filename}",
-        f"{DEFINE_EDGE_BASE_URL}/pdfs/{filename}",
-    ]
+    # Construct the Define Edge URL for the PDF.
+    # Define Edge sometimes uses an opaque file-id without a `.pdf` suffix, so try both.
+    filenames_to_try = [filename]
+    if filename.lower().endswith(".pdf"):
+        filenames_to_try.append(filename[:-4])
+
+    possible_urls = []
+    for name in filenames_to_try:
+        possible_urls.extend([
+            f"{DEFINE_EDGE_BASE_URL}/api/v1/files/{name}",
+            f"{DEFINE_EDGE_BASE_URL}/files/{name}",
+            f"{DEFINE_EDGE_BASE_URL}/documents/{name}",
+            f"{DEFINE_EDGE_BASE_URL}/pdfs/{name}",
+        ])
     
     headers = {
         "Authorization": f"Bearer {DEFINE_EDGE_API_KEY}",
@@ -473,7 +577,14 @@ async def get_pdf(filename: str, page: int = None):
             except Exception:
                 continue
     
-    raise HTTPException(status_code=404, detail=f"PDF not found: {filename}")
+    accept = (request.headers.get("accept") or "").lower()
+    if "text/html" in accept:
+        return HTMLResponse(
+            status_code=404,
+            content=f"<html><body><h3>PDF not found</h3><p>{safe_name}</p></body></html>",
+        )
+
+    raise HTTPException(status_code=404, detail=f"PDF not found: {safe_name}")
 
 
 @app.get("/api/clusters", response_model=Dict[str, ClusterMeta])

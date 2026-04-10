@@ -57,6 +57,21 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 The API will be available at `http://localhost:8000`
 
+## PDF previews (Concall highlights)
+
+Chunks returned by `/api/node/{id}/chunks` may include a `pdf_url` like `/api/pdf/<filename>.pdf#page=<n>`.
+
+The backend serves PDFs from either:
+
+1) A local folder (recommended for dev)
+
+- Put PDF files in `financial-wordmap/pdfs/` (project root) with filenames matching the `source` field (often a UUID like `0501df4e-....pdf`).
+- Or set `PDF_LOCAL_DIR` in `.env` to point at your PDF directory.
+
+2) The Define Edge proxy (if configured)
+
+If a PDF is not present locally, the backend will attempt to proxy it from the Define Edge base URL and API key.
+
 ## API Endpoints
 
 | Endpoint | Method | Description |

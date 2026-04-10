@@ -24,6 +24,10 @@ DEFINE_EDGE_API_KEY = os.getenv("DEFINE_EDGE_API_KEY", "")
 # PDF Storage Configuration - proxied through backend via Vite proxy
 PDF_BASE_URL = os.getenv("PDF_BASE_URL", "/api/pdf")
 
+# Optional local PDF directory (useful during development / offline)
+# If set, /api/pdf/{filename} will serve files from this directory first.
+PDF_LOCAL_DIR = Path(os.getenv("PDF_LOCAL_DIR", str(Path(__file__).parent.parent / "pdfs")))
+
 # API Configuration
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("API_PORT", "8000"))
