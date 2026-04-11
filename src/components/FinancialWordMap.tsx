@@ -1,8 +1,9 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Search, X, RotateCcw, Loader2, Zap } from 'lucide-react';
-import { type MapNode, type ClusterType, type NodeHighlight } from '@/types';
+import { type MapNode, type ClusterType, type NodeHighlight, type DocumentChunk } from '@/types';
 import NodeDetailPanel from './NodeDetailPanel';
+import PDFViewerPanel from './PDFViewerPanel';
 import { useForceLayout } from '@/hooks/useForceLayout';
 import { usePanZoom } from '@/hooks/usePanZoom';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -30,6 +31,7 @@ export default function FinancialWordMap() {
   const isMobile = useIsMobile();
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [selectedChunk, setSelectedChunk] = useState<DocumentChunk | null>(null);
   const [selectedCluster, setSelectedCluster] = useState<ClusterType | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
@@ -321,10 +323,13 @@ export default function FinancialWordMap() {
             connectedLabels={selectedConnectedLabels}
             onClose={() => setSelectedNode(null)}
             onNodeNavigate={(nodeId) => setSelectedNode(nodeId)}
+            onChunkClick={setSelectedChunk}
             isMobile={isMobile}
           />
         )}
       </AnimatePresence>
+
+      <PDFViewerPanel chunk={selectedChunk} onClose={() => setSelectedChunk(null)} />
 
       {/* Bottom status bar */}
       {!isMobile && (

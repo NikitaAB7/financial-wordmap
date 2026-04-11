@@ -29,6 +29,7 @@ export interface DocumentChunk {
   relevance_score?: number;
   chunk_id?: string;
   chunk_type?: string;
+  category?: string;
   page?: number;
   bbox?: BoundingBox;
   page_width?: number;

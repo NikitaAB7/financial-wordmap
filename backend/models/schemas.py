@@ -34,6 +34,7 @@ class DocumentChunk(BaseModel):
     relevance_score: Optional[float] = None
     chunk_id: Optional[str] = None
     chunk_type: Optional[str] = None  # "table", "text", etc.
+    category: Optional[str] = None  # "concall", "annual-report", etc.
     page: Optional[int] = None
     bbox: Optional[BoundingBox] = None
     page_width: Optional[float] = None
