@@ -140,8 +140,8 @@ ASSET_CLASSES = {
 PHRASE_TO_SECTOR_ASSET = {
     # Energy related
     ("oil", "crude", "opec", "refinery", "energy crisis", "petrol", "diesel", "brent", "wti"): ["Energy", "crude_oil"],
-    # Geopolitical
-    ("war", "conflict", "sanction", "iran", "middle east", "russia", "ukraine", "geopolitical", "tension"): ["Energy", "crude_oil", "gold"],
+    # Geopolitical / war
+    ("war", "conflict", "sanction", "iran", "middle east", "russia", "ukraine", "geopolitical", "tension"): ["theme_geopolitics", "Energy", "crude_oil", "gold"],
     # Monetary policy
     ("inflation", "fed", "rate hike", "interest rate", "rbi", "monetary policy", "repo rate", "cpi"): ["Banking", "Financial", "fixed_income", "usd_inr"],
     # Safe haven
@@ -164,6 +164,14 @@ PHRASE_TO_SECTOR_ASSET = {
     ("bull", "bear", "rally", "crash", "correction", "fii", "dii"): ["nifty50"],
 }
 
+# High-level theme nodes (these are not sectors/assets/stocks but can be used as topic clusters)
+THEMES = {
+    "theme_geopolitics": {
+        "label": "War & Geopolitics",
+        "keywords": ["war", "conflict", "sanction", "geopolitical", "tension", "missile", "ceasefire"],
+    },
+}
+
 
 # =============================================================================
 # Topic Mapper Service
@@ -181,6 +189,14 @@ class TopicMapperService:
     def _build_graph(self):
         """Build the static knowledge graph"""
         self.nodes: Dict[str, GraphNode] = {}
+
+        # Add theme nodes
+        for theme_id, info in THEMES.items():
+            self.nodes[theme_id] = GraphNode(
+                id=theme_id,
+                label=info["label"],
+                node_type="news_topic",
+            )
         
         # Add stock nodes
         for ticker, info in NIFTY_50_STOCKS.items():
@@ -230,6 +246,8 @@ class TopicMapperService:
                             matched_entities.add(f"sector_{entity.lower().replace(' ', '_')}")
                         elif entity in ASSET_CLASSES:
                             matched_entities.add(entity)
+                        elif isinstance(entity, str) and entity.startswith("theme_"):
+                            matched_entities.add(entity)
                         elif entity in [s.lower() for s in NIFTY_50_STOCKS]:
                             matched_entities.add(entity)
         
@@ -249,8 +267,22 @@ class TopicMapperService:
         
         # Calculate relevance score
         relevance = min(1.0, match_count / 3.0) if match_count > 0 else 0.0
-        
-        return list(matched_entities), relevance
+
+        # Deterministic ordering so clustering is stable and "theme" topics (e.g. war)
+        # can become the primary group when present.
+        def _priority(entity_id: str) -> tuple:
+            if entity_id.startswith("theme_"):
+                p = 0
+            elif entity_id in ASSET_CLASSES:
+                p = 1
+            elif entity_id.startswith("sector_"):
+                p = 2
+            else:
+                p = 3
+            return (p, entity_id)
+
+        ordered = sorted(matched_entities, key=_priority)
+        return ordered, relevance
     
     def expand_entities_through_graph(self, entities: List[str], max_hops: int = 2) -> List[str]:
         """
@@ -315,8 +347,9 @@ class TopicMapperService:
         Cluster news headlines into topics based on entity overlap
         Returns top-k most active topics
         """
-        # Group headlines by their primary entity mapping
+        # Group headlines by their entity mapping
         entity_groups: Dict[str, List[Dict]] = defaultdict(list)
+        entity_seen_titles: Dict[str, Set[str]] = defaultdict(set)
         
         for item in news_items:
             title = item.get("title", "")
@@ -326,16 +359,22 @@ class TopicMapperService:
             entities, relevance = self.map_headline_to_entities(title, snippet)
             
             if entities:
-                # Use the first/primary entity as the group key
-                primary_entity = entities[0]
-                entity_groups[primary_entity].append({
-                    "title": title,
-                    "snippet": snippet,
-                    "sentiment": sentiment,
-                    "url": item.get("url"),
-                    "entities": entities,
-                    "relevance": relevance,
-                })
+                # Add this headline to up to two top entities.
+                # This increases topic variety while still keeping topics coherent.
+                for group_entity in entities[:2]:
+                    title_key = (title or "").strip().lower()
+                    if title_key and title_key in entity_seen_titles[group_entity]:
+                        continue
+                    if title_key:
+                        entity_seen_titles[group_entity].add(title_key)
+                    entity_groups[group_entity].append({
+                        "title": title,
+                        "snippet": snippet,
+                        "sentiment": sentiment,
+                        "url": item.get("url"),
+                        "entities": entities,
+                        "relevance": relevance,
+                    })
         
         # Create topic objects from groups
         topics = []

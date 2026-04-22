@@ -22,7 +22,10 @@ from models.schemas import (
 from services.qdrant_service import qdrant_service, NIFTY_50_STOCKS
 from services.tavily_service import tavily_service
 from services.topic_mapper import topic_mapper
+from services.daily_topic_clusters_service import daily_topic_clusters_service
 from services.llm_service import llm_service
+
+import math
 
 
 @asynccontextmanager
@@ -85,8 +88,67 @@ async def get_map_data():
     Data is sourced from Qdrant or fallback Nifty 50 data.
     """
     try:
-        nodes = qdrant_service.build_map_nodes()
-        edges = qdrant_service.build_map_edges(nodes)
+        base_nodes = qdrant_service.build_map_nodes()
+        base_edges = qdrant_service.build_map_edges(base_nodes)
+
+        # Replace static news nodes with DAILY TOPIC CLUSTERS (e.g., War, Bitcoin, Gold, Oil)
+        nodes = [n for n in base_nodes if n.cluster != "news"]
+
+        daily_topics = await daily_topic_clusters_service.get_daily_topics(max_topics=10)
+        from models.schemas import MapNode as MapNodeSchema, MapEdge as MapEdgeSchema
+
+        if daily_topics:
+            news_cx, news_cy = 150, 150
+            ring_radii = [70, 105]
+            ring_sizes = [5, 5]
+
+            def _compact_topic_label(name: str) -> str:
+                cleaned = " ".join((name or "").split())
+                cleaned = cleaned.replace("Impact", "").strip()
+                if len(cleaned) > 18:
+                    cleaned = cleaned[:15] + "..."
+                return cleaned or "Topic"
+
+            news_nodes = []
+            for idx, wrapped in enumerate(daily_topics[:10]):
+                topic = wrapped.topic
+                ring = 0 if idx < ring_sizes[0] else 1
+                ring_idx = idx if ring == 0 else (idx - ring_sizes[0])
+                angle = (360 / ring_sizes[ring]) * ring_idx - 90
+                r = ring_radii[ring]
+                x = news_cx + r * math.cos(math.radians(angle))
+                y = news_cy + r * math.sin(math.radians(angle))
+                news_nodes.append(
+                    {
+                        "id": topic.id,
+                        "label": _compact_topic_label(topic.name),
+                        "cluster": "news",
+                        "x": max(50, min(300, x)),
+                        "y": max(50, min(300, y)),
+                        "size": 24,
+                        "sublabel": "TOPIC",
+                    }
+                )
+
+            nodes.extend([MapNodeSchema(**n) for n in news_nodes])
+
+            # Add topic -> entity edges
+            node_ids = {n.id for n in nodes}
+            dynamic_edges = []
+            for wrapped in daily_topics[:10]:
+                topic = wrapped.topic
+                # Keep only entities that exist in the current map
+                in_graph = [e for e in topic.linked_entities if e in node_ids]
+                # Limit fanout
+                for target in in_graph[:6]:
+                    dynamic_edges.append(MapEdgeSchema(source=topic.id, target=target, label="topic"))
+
+            edges = base_edges + dynamic_edges
+        else:
+            edges = base_edges
+
+        node_ids = {n.id for n in nodes}
+        edges = [e for e in edges if e.source in node_ids and e.target in node_ids]
         
         # Convert to dict format expected by frontend
         return MapDataResponse(
@@ -126,6 +188,40 @@ async def get_node_details(node_id: str):
         
         news = await tavily_service.get_topic_news(node_id, topic_label)
         return NodeDetailResponse(details=details, news=news)
+
+    # Daily topic bubble (topic_* nodes)
+    if daily_topic_clusters_service.is_topic_node_id(node_id):
+        wrapped = daily_topic_clusters_service.get_by_id(node_id)
+        if not wrapped:
+            await daily_topic_clusters_service.get_daily_topics(max_topics=10)
+            wrapped = daily_topic_clusters_service.get_by_id(node_id)
+
+        if wrapped:
+            topic = wrapped.topic
+            details = StockDetail(
+                price=0,
+                change=0,
+                changePercent=0,
+                volume="N/A",
+                marketCap="N/A",
+                sparkline=[0] * 8,
+                signal="neutral",
+                description=f"{topic.name}\n\n{topic.headline_count} related headlines".strip(),
+            )
+            # Convert clustered headlines into NewsItem objects
+            news = [
+                NewsItem(
+                    title=h.get("title", ""),
+                    source="Topic",
+                    time="Today",
+                    sentiment=h.get("sentiment", "neutral"),
+                    snippet=h.get("snippet", ""),
+                    url=h.get("url"),
+                    published_date=None,
+                )
+                for h in topic.headlines[:5]
+            ]
+            return NodeDetailResponse(details=details, news=news)
     
     # Get stock details
     details = qdrant_service.get_stock_details(node_id)
@@ -212,6 +308,28 @@ async def get_node_news(node_id: str, limit: int = 5):
         topic_label = NEWS_CLUSTER_TOPICS[node_id]
         news = await tavily_service.get_topic_news(node_id, topic_label)
         return news[:limit]
+
+    # Daily topic bubble
+    if daily_topic_clusters_service.is_topic_node_id(node_id):
+        wrapped = daily_topic_clusters_service.get_by_id(node_id)
+        if not wrapped:
+            await daily_topic_clusters_service.get_daily_topics(max_topics=10)
+            wrapped = daily_topic_clusters_service.get_by_id(node_id)
+        if wrapped:
+            topic = wrapped.topic
+            news = [
+                NewsItem(
+                    title=h.get("title", ""),
+                    source="Topic",
+                    time="Today",
+                    sentiment=h.get("sentiment", "neutral"),
+                    snippet=h.get("snippet", ""),
+                    url=h.get("url"),
+                    published_date=None,
+                )
+                for h in topic.headlines[:limit]
+            ]
+            return news[:limit]
     
     # Check if this is a sector
     if node_id in SECTOR_INFO:
@@ -259,6 +377,25 @@ async def get_stock_details_only(node_id: str):
             signal="neutral",
             description=topic_descriptions.get(node_id, f"News and analysis about {topic_label}"),
         )
+
+    # Daily topic bubble
+    if daily_topic_clusters_service.is_topic_node_id(node_id):
+        wrapped = daily_topic_clusters_service.get_by_id(node_id)
+        if not wrapped:
+            await daily_topic_clusters_service.get_daily_topics(max_topics=10)
+            wrapped = daily_topic_clusters_service.get_by_id(node_id)
+        if wrapped:
+            topic = wrapped.topic
+            return StockDetail(
+                price=0,
+                change=0,
+                changePercent=0,
+                volume="N/A",
+                marketCap="N/A",
+                sparkline=[0] * 8,
+                signal="neutral",
+                description=f"{topic.name}\n\n{topic.headline_count} related headlines".strip(),
+            )
     
     # Check if this is a sector
     if node_id in SECTOR_INFO:

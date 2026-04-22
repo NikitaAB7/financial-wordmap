@@ -282,11 +282,11 @@ export default function NodeDetailPanel({ node, connectedLabels, onClose, onNode
             )}
           </div>
 
-          {/* Concalls */}
+          {/* Document Highlights */}
           <div className="pt-2 border-t border-border">
             <div className="flex items-center gap-1.5 mb-2">
               <FileText size={11} className="text-muted-foreground" />
-              <p className="font-mono text-[9px] text-muted-foreground tracking-wider">CONCALL HIGHLIGHTS</p>
+              <p className="font-mono text-[9px] text-muted-foreground tracking-wider">DOCUMENT HIGHLIGHTS</p>
             </div>
             {chunksError ? (
               <p className="text-[10px] text-destructive text-center py-1">Error loading</p>
@@ -419,11 +419,11 @@ export default function NodeDetailPanel({ node, connectedLabels, onClose, onNode
           )}
         </div>
 
-        {/* Concall Highlights */}
+        {/* Document Highlights */}
         <div className="px-4 py-3 border-b border-border">
           <div className="flex items-center gap-1.5 mb-2">
             <FileText size={11} className="text-muted-foreground" />
-            <p className="font-mono text-[9px] text-muted-foreground tracking-wider">CONCALL HIGHLIGHTS</p>
+            <p className="font-mono text-[9px] text-muted-foreground tracking-wider">DOCUMENT HIGHLIGHTS</p>
             <span className="font-mono text-[8px] text-muted-foreground/50 ml-auto">Click to view PDF</span>
           </div>
           {chunksError ? (

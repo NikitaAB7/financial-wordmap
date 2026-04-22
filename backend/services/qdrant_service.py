@@ -450,9 +450,7 @@ class QdrantService:
                 with_vectors=False,
             )
             
-            recent_chunks = []
             all_chunks = []
-            cutoff_date = datetime.now() - timedelta(days=MAX_CHUNK_AGE_DAYS)
             
             for point in results:
                 payload = point.payload or {}
@@ -512,18 +510,11 @@ class QdrantService:
                 )
                 
                 all_chunks.append((doc_date, chunk))
-                
-                # Track recent chunks separately
-                if doc_date and doc_date >= cutoff_date:
-                    recent_chunks.append((doc_date, chunk))
             
-            # Prefer recent chunks, but fall back to all chunks if none found
-            chunks_to_use = recent_chunks if recent_chunks else all_chunks
+            # Sort by date (newest first) and return
+            all_chunks.sort(key=lambda x: x[0] or datetime.min, reverse=True)
             
-            # Sort by date (newest first)
-            chunks_to_use.sort(key=lambda x: x[0] or datetime.min, reverse=True)
-            
-            return [chunk for _, chunk in chunks_to_use[:limit]]
+            return [chunk for _, chunk in all_chunks[:limit]]
             
         except Exception as e:
             print(f"Error retrieving chunks for node {node_id}: {e}")

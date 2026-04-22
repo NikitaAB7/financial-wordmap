@@ -186,24 +186,24 @@ export default function FinancialWordMap() {
         )}
       </div>
 
-      {/* Search bar */}
-      <div className={`absolute z-10 ${isMobile ? 'top-3 right-3 left-auto' : 'top-5 left-1/2 -translate-x-1/2'}`}>
-        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all ${
-          searchFocused ? 'border-primary/50 bg-card shadow-lg' : 'border-border bg-card/60'
-        }`} style={{ width: isMobile ? 160 : 260 }}>
-          <Search size={13} className="text-muted-foreground flex-shrink-0" />
+      {/* Search bar with autocomplete */}
+      <div className={`absolute z-20 ${isMobile ? 'top-3 right-3 left-auto' : 'top-5 left-1/2 -translate-x-1/2'}`}>
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all backdrop-blur-sm ${
+          searchFocused ? 'border-primary/50 bg-card shadow-lg shadow-primary/10' : 'border-border bg-card/80'
+        }`} style={{ width: isMobile ? 160 : 280 }}>
+          <Search size={13} className={`flex-shrink-0 transition-colors ${searchFocused ? 'text-primary' : 'text-muted-foreground'}`} />
           <input
             ref={searchRef}
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
-            placeholder="Search…"
+            onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+            placeholder="Search nodes…"
             className="bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none w-full font-mono"
           />
           {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="text-muted-foreground hover:text-foreground">
+            <button onClick={() => setSearchQuery('')} className="text-muted-foreground hover:text-foreground transition-colors">
               <X size={12} />
             </button>
           )}
@@ -211,7 +211,43 @@ export default function FinancialWordMap() {
             <span className="font-mono text-[9px] text-muted-foreground border border-border rounded px-1 py-0.5">/</span>
           )}
         </div>
-        {searchQuery.trim() && (
+        
+        {/* Autocomplete dropdown */}
+        {searchFocused && searchQuery.trim() && searchMatches.size > 0 && (
+          <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-xl shadow-black/20 overflow-hidden max-h-64 overflow-y-auto">
+            {layoutNodes
+              .filter(n => searchMatches.has(n.id))
+              .slice(0, 8)
+              .map(node => (
+                <button
+                  key={node.id}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setSearchQuery('');
+                    setSearchFocused(false);
+                    setSelectedNode(node.id);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-secondary/50 transition-colors text-left"
+                >
+                  <span 
+                    className="w-2 h-2 rounded-full flex-shrink-0" 
+                    style={{ backgroundColor: CLUSTER_HSL[node.cluster] }}
+                  />
+                  <span className="font-mono text-xs text-foreground truncate">{node.label}</span>
+                  <span className="font-mono text-[9px] text-muted-foreground ml-auto uppercase">
+                    {node.cluster}
+                  </span>
+                </button>
+              ))}
+            {searchMatches.size > 8 && (
+              <div className="px-3 py-1.5 text-[9px] font-mono text-muted-foreground border-t border-border bg-secondary/30">
+                +{searchMatches.size - 8} more results
+              </div>
+            )}
+          </div>
+        )}
+        
+        {searchQuery.trim() && !searchFocused && (
           <div className="font-mono text-[9px] text-muted-foreground text-center mt-1">
             {searchMatches.size} match{searchMatches.size !== 1 ? 'es' : ''}
           </div>
